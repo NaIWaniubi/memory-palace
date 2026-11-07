@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:name=".app.MemoryPalaceApplication"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SpatialApp"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".app.LaunchActivity"
+            android:exported="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|uiMode|keyboardHidden|navigation|keyboard"
+            android:theme="@style/Theme.SpatialApp">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- 房间层 Stage 配置（默认容器 = Stage，对齐官方 SpatialAudio Sample） -->
+            <meta-data
+                android:name="pico.spatial.stage.id"
+                android:value="room_stage" />
+            <!-- 1: Mixed（MR 混合，虚拟内容 + 真实环境） -->
+            <meta-data
+                android:name="pico.spatial.stage.style"
+                android:value="1" />
+        </activity>
+    </application>
+
+</manifest>
