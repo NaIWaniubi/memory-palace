@@ -91,6 +91,19 @@ object ReviewSession {
         }
     }
 
+    /** 单卡复习（演示路径修复）：从锚定卡片直接发起，queue 只含这一张。 */
+    fun startSingle(cardId: String) {
+        scope.launch {
+            val card = DataGraph.repository.cards.first().firstOrNull { it.id == cardId }
+            if (card == null) {
+                Log.w(TAG, "startSingle: card $cardId not found")
+                return@launch
+            }
+            state.value = State(queue = listOf(card), index = 0, revealed = false)
+            Log.i(TAG, "startSingle: ${card.front} id=${card.id.take(8)}")
+        }
+    }
+
     fun reveal() {
         val s = state.value ?: return
         state.value = s.copy(revealed = true)

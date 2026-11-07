@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.memorypalace.anchor.AnchorScene
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.data.ImportPickerActivity
@@ -140,12 +141,20 @@ fun DueQueueView() {
                 MpText("复习中 ${session!!.index + 1}/${session!!.total}", fontSize = MpType.Body, color = MpColors.Info)
             }
         }
-        due.take(6).forEach { c ->
+        due.take(6).forEachIndexed { i, c ->
             val intervalText = if (c.intervalDays < 1.0) "新卡/重学" else "${c.intervalDays.toInt()}d"
-            MpText(
-                "· ${c.front} — ${c.back}（reps=${c.repetitions} ef=${"%.2f".format(c.easiness)} 间隔=$intervalText id=${c.id.take(8)}）",
-                fontSize = MpType.BodySmall,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
+                MpText(
+                    "· ${c.front} — ${c.back}（reps=${c.repetitions} ef=${"%.2f".format(c.easiness)} 间隔=$intervalText id=${c.id.take(8)}）",
+                    fontSize = MpType.BodySmall,
+                )
+                // 放置动作的真实入口：把到期卡钉到面前 1.5m（无头等价：anchor.PLACE）
+                if (i == 0) {
+                    Button(onClick = { AnchorScene.placeForCard(c.id, 0.0f, 1.2f, -1.5f) }) {
+                        MpText("钉入房间", fontSize = MpType.Caption)
+                    }
+                }
+            }
         }
         if (due.size > 6) {
             MpText("…还有 ${due.size - 6} 张", fontSize = MpType.Caption, color = MpColors.TextSecondary)

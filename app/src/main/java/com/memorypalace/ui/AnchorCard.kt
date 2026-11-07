@@ -17,6 +17,7 @@ import com.memorypalace.core.schedule.Scheduler
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.review.ReviewSession
+import com.pico.spatial.ui.design.Button
 import com.pico.spatial.ui.design.Text
 import kotlin.math.max
 
@@ -77,6 +78,12 @@ fun AnchorCard(rec: AnchorRecord) {
             fontSize = MpType.Caption2,
             color = MpColors.TextSecondary,
         )
+        // 走到卡片前的真实复习入口（真机射线可点；模拟器无空间交互，记为真机待验）
+        if (card != null && session == null) {
+            Button(onClick = { ReviewSession.startSingle(card.id) }) {
+                Text("复习这张", fontSize = MpType.BodySmall)
+            }
+        }
     }
 }
 

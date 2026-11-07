@@ -37,8 +37,35 @@ object DualStateController {
 
     private val scope = MainScope()
     private var reviewCardOpen = true
+    private var appContext: Context? = null
+    private var autoOpened = false
+
+    /**
+     * 冷启动自动开三窗（演示路径修复）：窗口声明后不会自动显示，
+     * 冷启动若无此行，评委打开应用只能看到空房间——现场没有任何开窗口的入口。
+     * 由 mainApp 组合入口调用；容器注册晚于组合入口，故带重试（实测首次调用
+     * 抛 IllegalStateException: WindowContainer not registered）。
+     */
+    fun autoOpenOnce() {
+        if (autoOpened) return
+        autoOpened = true
+        scope.launch {
+            repeat(20) { attempt ->
+                try {
+                    appContext?.let { openWindows(it) }
+                    DualStateProbe.log("controller", "autoOpenOnce: windows opened at attempt ${attempt + 1}")
+                    return@launch
+                } catch (e: IllegalStateException) {
+                    DualStateProbe.log("controller", "autoOpenOnce attempt ${attempt + 1}: ${e.message}")
+                    kotlinx.coroutines.delay(1500)
+                }
+            }
+            DualStateProbe.log("controller", "autoOpenOnce: gave up after 20 attempts")
+        }
+    }
 
     fun register(context: Context) {
+        appContext = context.applicationContext
         val filter = IntentFilter().apply {
             addAction(ACTION_OPEN_STAGE)
             addAction(ACTION_CLOSE_STAGE)

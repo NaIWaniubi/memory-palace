@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -79,53 +80,76 @@ object AnchorScene {
     fun place(x: Float, y: Float, z: Float, front: String, back: String) {
         scope.launch {
             val card = DataGraph.repository.add(front, back)
-            val title = if (back.isBlank()) front else "$front  $back"
-            Log.i(TAG, "createAnchor requested pos=($x,$y,$z) card=${card.id.take(8)}")
-            val result = WorldTrackingManager.createAnchor(
-                Vector3(x, y, z), EulerAngles(0f, 0f, 0f), "mp:${card.id.take(8)}"
-            )
-            val rec = when (result) {
-                is WorldTrackingResult.Success -> {
-                    val a = result.data ?: run {
-                        Log.e(TAG, "createAnchor SUCCESS but data is null")
-                        return@launch
-                    }
-                    val t = a.transform
-                    Log.i(
-                        TAG,
-                        "createAnchor SUCCESS uuid=${a.anchorUUID} resolvedPos=" +
-                            "(${t.position.x},${t.position.y},${t.position.z})"
-                    )
-                    AnchorRecord(
-                        key = card.id,
-                        uuid = a.anchorUUID.toString(),
-                        title = title,
-                        px = t.position.x, py = t.position.y, pz = t.position.z,
-                        pitch = t.rotation.pitch, yaw = t.rotation.yaw, roll = t.rotation.roll,
-                        placedAt = System.currentTimeMillis(),
-                    )
-                }
-                is WorldTrackingResult.Error -> {
-                    // 锚点服务不可用（如模拟器不支持）：记录回退位姿，场景里按位姿直渲并标注
-                    Log.e(TAG, "createAnchor ERROR code=${result.errorCode} msg=${result.errorMessage}")
-                    AnchorRecord(
-                        key = card.id,
-                        uuid = null,
-                        title = title,
-                        px = x, py = y, pz = z,
-                        pitch = 0f, yaw = 0f, roll = 0f,
-                        placedAt = System.currentTimeMillis(),
-                    )
-                }
-                else -> {
-                    Log.e(TAG, "createAnchor unknown result: $result")
-                    return@launch
-                }
-            }
-            records.value = records.value + rec
-            store.save(records.value)
-            Log.i(TAG, "record persisted key=${rec.key} uuid=${rec.uuid} total=${records.value.size}")
+            bind(card.id, if (back.isBlank()) front else "$front  $back", x, y, z)
         }
+    }
+
+    /**
+     * 把已有卡片钉进房间（演示路径修复：放置动作的真实 UI 入口用）。
+     * 不新建卡、不重复锚定；位姿缺省由调用方给（如面板按钮用预设面前位姿）。
+     */
+    fun placeForCard(cardId: String, x: Float, y: Float, z: Float) {
+        scope.launch {
+            val card = DataGraph.repository.cards.first().firstOrNull { it.id == cardId }
+            if (card == null) {
+                Log.w(TAG, "placeForCard: card not found $cardId")
+                return@launch
+            }
+            if (records.value.any { it.key == cardId }) {
+                Log.i(TAG, "placeForCard: already anchored ${card.front}, skip")
+                return@launch
+            }
+            bind(card.id, "${card.front}  ${card.back}", x, y, z)
+        }
+    }
+
+    /** 建锚 + 落记录 + 持久化（place / placeForCard 共用）。 */
+    private suspend fun bind(cardId: String, title: String, x: Float, y: Float, z: Float) {
+        Log.i(TAG, "createAnchor requested pos=($x,$y,$z) card=${cardId.take(8)}")
+        val result = WorldTrackingManager.createAnchor(
+            Vector3(x, y, z), EulerAngles(0f, 0f, 0f), "mp:${cardId.take(8)}"
+        )
+        val rec = when (result) {
+            is WorldTrackingResult.Success -> {
+                val a = result.data ?: run {
+                    Log.e(TAG, "createAnchor SUCCESS but data is null")
+                    return
+                }
+                val t = a.transform
+                Log.i(
+                    TAG,
+                    "createAnchor SUCCESS uuid=${a.anchorUUID} resolvedPos=" +
+                        "(${t.position.x},${t.position.y},${t.position.z})"
+                )
+                AnchorRecord(
+                    key = cardId,
+                    uuid = a.anchorUUID.toString(),
+                    title = title,
+                    px = t.position.x, py = t.position.y, pz = t.position.z,
+                    pitch = t.rotation.pitch, yaw = t.rotation.yaw, roll = t.rotation.roll,
+                    placedAt = System.currentTimeMillis(),
+                )
+            }
+            is WorldTrackingResult.Error -> {
+                // 锚点服务不可用（如模拟器不支持）：记录回退位姿，场景里按位姿直渲并标注
+                Log.e(TAG, "createAnchor ERROR code=${result.errorCode} msg=${result.errorMessage}")
+                AnchorRecord(
+                    key = cardId,
+                    uuid = null,
+                    title = title,
+                    px = x, py = y, pz = z,
+                    pitch = 0f, yaw = 0f, roll = 0f,
+                    placedAt = System.currentTimeMillis(),
+                )
+            }
+            else -> {
+                Log.e(TAG, "createAnchor unknown result: $result")
+                return
+            }
+        }
+        records.value = records.value + rec
+        store.save(records.value)
+        Log.i(TAG, "record persisted key=${rec.key} uuid=${rec.uuid} total=${records.value.size}")
     }
 
     fun clear() {

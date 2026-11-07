@@ -22,6 +22,7 @@ import com.pico.spatial.ui.platform.resize.ContainerResizeType
 fun mainApp(scope: SpatialAppScope) =
     with(scope) {
         DualStateProbe.log("mainApp", "compose entry")
+        DualStateController.autoOpenOnce()  // 冷启动即开三窗，现场无"开窗口"入口的兜底
 
         // 房间层：默认容器（全局唯一 default 必须给 Stage，否则与窗口容器冲突）
         DefaultStage {
