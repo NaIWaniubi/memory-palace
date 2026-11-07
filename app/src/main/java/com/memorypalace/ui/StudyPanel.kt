@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
+import com.memorypalace.data.ImportPickerActivity
 import com.memorypalace.probe.DualStateController
 import com.memorypalace.probe.DualStateProbe
 import com.memorypalace.review.ReviewSession
@@ -50,7 +51,19 @@ fun StudyPanel() {
             Button(onClick = { DualStateController.toggleReviewCard(context) }) {
                 MpText("开关随身卡窗口", fontSize = 16.sp)
             }
+            Button(onClick = {
+                context.startActivity(android.content.Intent(context, ImportPickerActivity::class.java))
+            }) {
+                MpText("导入牌组", fontSize = 16.sp)
+            }
         }
+
+        MpText(
+            "导入（M5）：支持 CSV / 纯文本 / Anki .apkg，离线解析。无头：adb push 后 " +
+                "am broadcast -a com.memorypalace.card.IMPORT --es path /sdcard/…",
+            fontSize = 13.sp,
+            color = Color(0xFF9AA3B2),
+        )
 
         MpText(
             "无头驱动（模拟器点不了空间按钮时用）：adb shell am broadcast -a com.memorypalace.dualstate.OPEN_STAGE / CLOSE_STAGE / TOGGLE_REVIEW_CARD",

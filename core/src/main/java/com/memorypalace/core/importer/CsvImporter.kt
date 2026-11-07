@@ -1,0 +1,56 @@
+package com.memorypalace.core.importer
+
+/**
+ * CSV 导入（M5）。标准 CSV：每行 `正面,背面`，支持引号包裹（字段内可含逗号/换行，
+ * 双引号用 "" 转义）。首行若为表头（front/back、正面/背面等）自动跳过。
+ * 纯 JVM 实现，不依赖任何库。
+ */
+object CsvImporter {
+
+    private val HEADER_HINTS = setOf("front", "back", "正面", "背面", "question", "answer", "term", "definition")
+
+    fun parse(text: String): List<ImportedCard> {
+        val rows = parseRows(text)
+        if (rows.isEmpty()) return emptyList()
+
+        val first = rows.first()
+        val hasHeader = first.any { cell -> cell.trim().lowercase() in HEADER_HINTS }
+        val data = if (hasHeader) rows.drop(1) else rows
+
+        return data.mapNotNull { row ->
+            val front = row.getOrElse(0) { "" }.trim()
+            val back = row.getOrElse(1) { "" }.trim()
+            if (front.isEmpty()) null else ImportedCard(front, back)
+        }
+    }
+
+    /** RFC4180 风格行解析：返回每行的字段列表（换行可出现在引号内）。 */
+    internal fun parseRows(text: String): List<List<String>> {
+        val rows = mutableListOf<List<String>>()
+        val row = mutableListOf<String>()
+        val field = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        fun endField() { row.add(field.toString()); field.setLength(0) }
+        fun endRow() { endField(); rows.add(row.toList()); row.clear() }
+
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                inQuotes -> when {
+                    c == '"' && i + 1 < text.length && text[i + 1] == '"' -> { field.append('"'); i++ }
+                    c == '"' -> inQuotes = false
+                    else -> field.append(c)
+                }
+                c == '"' && field.isEmpty() -> inQuotes = true
+                c == ',' -> endField()
+                c == '\r' -> { /* skip */ }
+                c == '\n' -> endRow()
+                else -> field.append(c)
+            }
+            i++
+        }
+        if (field.isNotEmpty() || row.isNotEmpty()) endRow()
+        return rows.filter { r -> r.any { it.isNotBlank() } }
+    }
+}

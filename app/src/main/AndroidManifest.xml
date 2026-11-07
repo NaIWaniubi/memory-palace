@@ -32,6 +32,12 @@
                 android:name="pico.spatial.stage.style"
                 android:value="1" />
         </activity>
+
+        <!-- M5 导入：系统文件选择器入口（真机用；模拟器走 card.IMPORT 广播） -->
+        <activity
+            android:name=".data.ImportPickerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 
 </manifest>
