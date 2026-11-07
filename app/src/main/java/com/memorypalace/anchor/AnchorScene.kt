@@ -145,6 +145,9 @@ object AnchorScene {
     /**
      * Stage 重建后的恢复校验：按 UUID 调 loadAnchor，把系统解析出的位姿
      * 与持久层保存的位姿逐条对比打日志（一致性证据）。
+     *
+     * M6 增补：解析不出来的 UUID（锚点丢失，如模拟器进程重启后）会把记录
+     * 降级为 uuid=null 并持久化 —— 场景按保存位姿回退直渲，卡片不消失。
      */
     suspend fun verifyRestored(recs: List<AnchorRecord>) {
         val anchored = recs.filter { it.uuid != null }
@@ -164,21 +167,39 @@ object AnchorScene {
                     when (val r = WorldTrackingManager.loadAnchor(arrayOf(UUID.fromString(rec.uuid)))) {
                         is WorldTrackingResult.Success ->
                             reportLoaded(listOf(rec), (r.data ?: emptyArray()).associateBy { it.anchorUUID.toString() })
-                        is WorldTrackingResult.Error ->
+                        is WorldTrackingResult.Error -> {
                             Log.e(TAG, "verifyRestored: uuid=${rec.uuid} NOT resolved code=${r.errorCode} msg=${r.errorMessage}")
+                            rec.uuid?.let { u -> synchronized(lostLock) { lost.add(u) } }
+                        }
                         else -> Log.e(TAG, "verifyRestored: unknown result $r")
                     }
                 }
             }
             else -> Log.e(TAG, "verifyRestored: unknown result $result")
         }
+        downgradeLost()
     }
+
+    /** 把 loadAnchor 解析失败的记录降级为回退位姿（uuid=null），持久化并触发场景重建。 */
+    private fun downgradeLost() {
+        val lostUuids = synchronized(lostLock) { lost.toSet().also { lost.clear() } }
+        if (lostUuids.isEmpty()) return
+        records.value = records.value.map { rec ->
+            if (rec.uuid in lostUuids) rec.copy(uuid = null) else rec
+        }
+        store.save(records.value)
+        Log.w(TAG, "downgraded ${lostUuids.size} lost anchor(s) to fallback pose: $lostUuids")
+    }
+
+    private val lostLock = Any()
+    private val lost = mutableListOf<String>()
 
     private fun reportLoaded(anchored: List<AnchorRecord>, loaded: Map<String, com.pico.spatial.sense.world.WorldAnchor>) {
         anchored.forEach { rec ->
             val a = loaded[rec.uuid]
             if (a == null) {
                 Log.e(TAG, "verifyRestored: uuid=${rec.uuid} NOT resolved (anchor lost)")
+                rec.uuid?.let { u -> synchronized(lostLock) { lost.add(u) } }
             } else {
                 val p = a.transform.position
                 val dx = p.x - rec.px; val dy = p.y - rec.py; val dz = p.z - rec.pz

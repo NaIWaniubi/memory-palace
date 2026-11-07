@@ -30,16 +30,26 @@ object Clock {
 
     fun now(): Long = System.currentTimeMillis() + offsetMillis
 
+    /** 当前偏移（天），供 UI 展示。 */
+    fun offsetDays(): Long = offsetMillis / (24L * 60 * 60 * 1000)
+
+    /** M6 时间机器：设置绝对偏移（天）。 */
+    fun setOffsetDays(days: Long) {
+        offsetMillis = days * 24L * 60 * 60 * 1000
+        tick.value += 1
+        Log.i(TAG, "offset set to ${days}d (${offsetMillis}ms), now=${now()}")
+    }
+
+    /** M6 时间机器：在现有偏移上累加（天）。 */
+    fun addDays(days: Long) = setOffsetDays(offsetDays() + days)
+
     fun register(context: Context) {
         val filter = IntentFilter(ACTION_SET_OFFSET)
         ContextCompat.registerReceiver(
             context.applicationContext,
             object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context, intent: Intent) {
-                    val days = intent.getLongExtra("days", 0L)
-                    offsetMillis = days * 24L * 60 * 60 * 1000
-                    tick.value += 1
-                    Log.i(TAG, "offset set to ${days}d (${offsetMillis}ms), now=${now()}")
+                    setOffsetDays(intent.getLongExtra("days", 0L))
                 }
             },
             filter,

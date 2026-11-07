@@ -71,10 +71,44 @@ fun StudyPanel() {
             color = Color(0xFF9AA3B2),
         )
 
+        TimeMachineView()
+
         DueQueueView()
 
         EventLogView(maxLines = 7)
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** 时间机器（M6）：一键快进，看卡片集体褪色 + 到期队列堆积。 */
+@Composable
+fun TimeMachineView() {
+    val tick by Clock.tick.collectAsState()
+    val offset = remember(tick) { Clock.offsetDays() }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MpText(
+                "时间机器：当前偏移 ${if (offset >= 0) "+" else ""}${offset} 天",
+                fontSize = 20.sp,
+                fontWeight = FontWeight(700),
+                color = if (offset == 0L) Color(0xFF9AA3B2) else Color(0xFFFF79C6),
+            )
+            Button(onClick = { Clock.addDays(1) }) {
+                MpText("+1 天", fontSize = 14.sp)
+            }
+            Button(onClick = { Clock.addDays(7) }) {
+                MpText("+7 天", fontSize = 14.sp)
+            }
+            Button(onClick = { Clock.setOffsetDays(0) }) {
+                MpText("复位", fontSize = 14.sp)
+            }
+        }
+        MpText(
+            "快进到未来：到期队列立即重算堆积，房间层锚定卡片按记忆强度褪色。无头：am broadcast -a com.memorypalace.clock.SET_OFFSET --el days 7",
+            fontSize = 13.sp,
+            color = Color(0xFF9AA3B2),
+        )
     }
 }
 

@@ -8,6 +8,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.memorypalace.anchor.AnchorScene
+import com.memorypalace.data.Clock
 import com.memorypalace.probe.DualStateProbe
 import com.pico.spatial.core.ecs.AnchorEntity
 import com.pico.spatial.core.ecs.Entity
@@ -31,10 +32,13 @@ fun RoomStage() {
     LifecycleLogger("room_stage", instanceId)
 
     val records by AnchorScene.records.collectAsState()
+    // M6：时间机器快进时也要重建场景 —— 附件面板的 GL 纹理不随 Compose 重组自动刷新，
+    // 实测（2026-11-07）tick 变化后 AnchorCard 褪色标签不更新，整视图重建才生效。
+    val tick by Clock.tick.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // 记录集合变化（放置/清除）时整体重建 SpatialView，重跑 initial 恢复流程
-    key(records) {
+    // 记录集合变化（放置/清除）或时钟跳变时整体重建 SpatialView，重跑 initial 恢复流程
+    key(records, tick) {
         SpatialView(
             initial = { content, attachments ->
                 DualStateProbe.log("room_stage", "inst#$instanceId SpatialView.initial anchors=${records.size}")
