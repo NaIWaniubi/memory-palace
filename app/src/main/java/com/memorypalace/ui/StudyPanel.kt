@@ -17,9 +17,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.probe.DualStateController
 import com.memorypalace.probe.DualStateProbe
+import com.memorypalace.review.ReviewSession
 import com.pico.spatial.ui.design.Button
 
 /** 书房面板（主窗口，Shared Space 常驻 2D 界面）。 */
@@ -67,15 +69,26 @@ fun StudyPanel() {
 @Composable
 fun DueQueueView() {
     val cards by DataGraph.repository.cards.collectAsState(initial = emptyList())
-    val due = remember(cards) { DataGraph.repository.dueQueue(cards) }
+    val tick by Clock.tick.collectAsState()  // 时间机器快进后到期队列要重算
+    val due = remember(cards, tick) { DataGraph.repository.dueQueue(cards) }
+    val session by ReviewSession.state.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        MpText(
-            "今日到期队列：${due.size} 张 / 共 ${cards.size} 张",
-            fontSize = 20.sp,
-            fontWeight = FontWeight(700),
-            color = if (due.isEmpty()) Color(0xFF8BE9A8) else Color(0xFFFFC107),
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MpText(
+                "今日到期队列：${due.size} 张 / 共 ${cards.size} 张",
+                fontSize = 20.sp,
+                fontWeight = FontWeight(700),
+                color = if (due.isEmpty()) Color(0xFF8BE9A8) else Color(0xFFFFC107),
+            )
+            if (session == null) {
+                Button(onClick = { ReviewSession.start() }) {
+                    MpText("开始复习", fontSize = 14.sp)
+                }
+            } else {
+                MpText("复习中 ${session!!.index + 1}/${session!!.total}", fontSize = 16.sp, color = Color(0xFF7CD4FD))
+            }
+        }
         due.take(6).forEach { c ->
             val intervalText = if (c.intervalDays < 1.0) "新卡/重学" else "${c.intervalDays.toInt()}d"
             MpText(
