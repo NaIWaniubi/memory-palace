@@ -49,33 +49,33 @@ fun AnchorCard(rec: AnchorRecord) {
     }
 
     val titleColor = when {
-        isCurrent -> Color(0xFF7CD4FD)
-        fade > 0.66f -> Color(0xFF6B7280)
-        fade > 0.33f -> Color(0xFFB0BEC5)
+        isCurrent -> MpColors.Info
+        fade > 0.66f -> MpColors.FadedDeep
+        fade > 0.33f -> MpColors.FadedMid
         else -> Color.White
     }
 
     Column(
-        modifier = Modifier.alpha(alpha).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.alpha(alpha).padding(MpSpace.CardAnchor),
+        verticalArrangement = Arrangement.spacedBy(MpSpace.Sm),
     ) {
         Text(
             (if (isCurrent) "▶ " else "") + (card?.front ?: rec.title),
-            fontSize = 22.sp,
+            fontSize = MpType.CardFront,
             color = titleColor,
         )
         if (card != null) {
-            Text(card.back, fontSize = 16.sp, color = titleColor.copy(alpha = 0.85f))
+            Text(card.back, fontSize = MpType.Body, color = titleColor.copy(alpha = 0.85f))
             Text(
                 memoryLabel(card, now, fade),
-                fontSize = 13.sp,
-                color = if (fade > 0f) Color(0xFFFFB86B) else Color(0xFF8BE9A8),
+                fontSize = MpType.Caption,
+                color = if (fade > 0f) MpColors.Warning else MpColors.Success,
             )
         }
         Text(
             if (rec.uuid != null) "锚点 ${rec.uuid.take(8)}…" else "未锚定（回退位姿）",
-            fontSize = 12.sp,
-            color = Color(0xFF9AA3B2),
+            fontSize = MpType.Caption2,
+            color = MpColors.TextSecondary,
         )
     }
 }

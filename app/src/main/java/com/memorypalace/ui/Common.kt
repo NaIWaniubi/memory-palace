@@ -48,9 +48,9 @@ fun LifecycleLogger(component: String, instanceId: Int) {
 fun MpText(
     text: String,
     modifier: Modifier = Modifier,
-    fontSize: TextUnit = 18.sp,
-    fontWeight: FontWeight = FontWeight(400),
-    color: Color = Color(0xFFE8EAF0),
+    fontSize: TextUnit = MpType.BodyLarge,
+    fontWeight: FontWeight = MpType.Regular,
+    color: Color = MpColors.TextPrimary,
 ) {
     Text(
         modifier = modifier,
@@ -68,14 +68,14 @@ fun EventLogView(modifier: Modifier = Modifier, maxLines: Int = 10) {
     val events by DualStateProbe.events.collectAsState()
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF12141A))
-            .padding(12.dp)
+            .clip(RoundedCornerShape(MpShape.Block))
+            .background(MpColors.SurfaceDark)
+            .padding(MpSpace.Md)
     ) {
-        MpText("事件日志（DualState / logcat 同步）", fontSize = 14.sp, fontWeight = FontWeight(700), color = Color(0xFF7CD4FD))
-        Spacer(Modifier.height(6.dp))
+        MpText("事件日志（DualState / logcat 同步）", fontSize = MpType.BodySmall, fontWeight = MpType.Bold, color = MpColors.Info)
+        Spacer(Modifier.height(MpSpace.Sm))
         events.takeLast(maxLines).forEach { line ->
-            MpText(line, fontSize = 11.sp, color = Color(0xFF9AA3B2))
+            MpText(line, fontSize = MpType.Caption2, color = MpColors.TextSecondary)
         }
     }
 }
@@ -84,14 +84,14 @@ fun EventLogView(modifier: Modifier = Modifier, maxLines: Int = 10) {
 @Composable
 fun StateCounter(component: String, instanceId: Int) {
     var count by remember { mutableIntStateOf(0) }
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
         com.pico.spatial.ui.design.Button(onClick = {
             count += 1
             DualStateProbe.log(component, "inst#$instanceId counter=$count")
         }) {
-            MpText("计数 +1", fontSize = 16.sp)
+            MpText("计数 +1", fontSize = MpType.Body)
         }
-        MpText("当前值：$count（切换后归零=状态丢失）", fontSize = 16.sp, color = Color(0xFFFFC107))
+        MpText("当前值：$count（切换后归零=状态丢失）", fontSize = MpType.Body, color = MpColors.Accent)
     }
 }
 
