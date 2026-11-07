@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.memorypalace.data.DataGraph
 import com.memorypalace.probe.DualStateController
 import com.memorypalace.probe.DualStateProbe
 import com.pico.spatial.ui.design.Button
@@ -53,7 +56,43 @@ fun StudyPanel() {
             color = Color(0xFF9AA3B2),
         )
 
-        EventLogView(maxLines = 9)
+        DueQueueView()
+
+        EventLogView(maxLines = 7)
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** 当日到期队列（M3）：Room 全量卡片 → Scheduler.dueQueue(Clock.now())。 */
+@Composable
+fun DueQueueView() {
+    val cards by DataGraph.repository.cards.collectAsState(initial = emptyList())
+    val due = remember(cards) { DataGraph.repository.dueQueue(cards) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        MpText(
+            "今日到期队列：${due.size} 张 / 共 ${cards.size} 张",
+            fontSize = 20.sp,
+            fontWeight = FontWeight(700),
+            color = if (due.isEmpty()) Color(0xFF8BE9A8) else Color(0xFFFFC107),
+        )
+        due.take(6).forEach { c ->
+            val intervalText = if (c.intervalDays < 1.0) "新卡/重学" else "${c.intervalDays.toInt()}d"
+            MpText(
+                "· ${c.front} — ${c.back}（reps=${c.repetitions} ef=${"%.2f".format(c.easiness)} 间隔=$intervalText id=${c.id.take(8)}）",
+                fontSize = 14.sp,
+            )
+        }
+        if (due.size > 6) {
+            MpText("…还有 ${due.size - 6} 张", fontSize = 13.sp, color = Color(0xFF9AA3B2))
+        }
+        if (cards.isEmpty()) {
+            MpText(
+                "加卡：am broadcast -a com.memorypalace.card.ADD --es front \"serendipity\" --es back \"n.意外之喜\"；" +
+                    "复习：…card.REVIEW --es id <前缀> --es grade remember|forgot",
+                fontSize = 12.sp,
+                color = Color(0xFF9AA3B2),
+            )
+        }
     }
 }

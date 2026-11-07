@@ -27,3 +27,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "memory-palace"
 include(":app")
+include(":core")
