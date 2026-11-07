@@ -10,8 +10,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * 真机文件选择入口（M5）：透明 Activity，弹出系统文件选择器，
- * 选完把 Uri 交给 ImportService 后自动关闭。模拟器无头验证走 card.IMPORT 广播。
+ * 真机文件选择入口（M5/M8）：透明 Activity，弹出系统文件选择器，
+ * 选完把 Uri 解析成预览发布到 ImportService.pendingPreview 后自动关闭——
+ * 字段映射确认页在书房面板里渲染（Spatial UI Compose fork 无法在普通 Activity setContent）。
+ * 模拟器无头验证走 card.IMPORT 广播（直导，不经确认页）。
  */
 class ImportPickerActivity : Activity() {
 
@@ -33,8 +35,7 @@ class ImportPickerActivity : Activity() {
             val uri = data?.data
             if (uri != null) {
                 scope.launch {
-                    val stats = ImportService.importFromUri(applicationContext, uri)
-                    Log.i(ImportService.TAG, "picker import done: $stats")
+                    ImportService.previewFromUri(applicationContext, uri)
                 }
             }
         }

@@ -34,20 +34,45 @@ object ImportService {
 
     const val TAG = "Import"
     const val ACTION_IMPORT = "com.memorypalace.card.IMPORT"
+    const val ACTION_PREVIEW = "com.memorypalace.card.PREVIEW"  // 无头验证确认页用：只解析不入库
+    const val ACTION_CONFIRM = "com.memorypalace.card.CONFIRM"  // 无头验证确认页用：等价点「确认导入」
+
+    /** 待确认的导入预览（字段映射确认页，M8）：SAF 选完文件先解析到这里，书房面板确认后才入库。 */
+    data class ImportPreview(
+        val format: String,
+        val fileName: String,
+        val cards: List<com.memorypalace.core.importer.ImportedCard>,
+    )
+
+    val pendingPreview = kotlinx.coroutines.flow.MutableStateFlow<ImportPreview?>(null)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun register(context: Context) {
-        val filter = IntentFilter(ACTION_IMPORT)
+        val filter = IntentFilter(ACTION_IMPORT).apply { addAction(ACTION_PREVIEW); addAction(ACTION_CONFIRM) }
         ContextCompat.registerReceiver(
             context.applicationContext,
             object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context, intent: Intent) {
-                    val path = intent.getStringExtra("path") ?: return
+                    val path = intent.getStringExtra("path")
                     val format = intent.getStringExtra("format")
                     scope.launch {
-                        val stats = importFromPath(ctx.applicationContext, path, format)
-                        Log.i(TAG, "broadcast import done: $stats")
+                        when (intent.action) {
+                            ACTION_CONFIRM -> Log.i(TAG, "confirm import done: ${confirmImport()}")
+                            ACTION_PREVIEW -> {
+                                if (path == null) return@launch
+                                val preview = previewFromPath(ctx.applicationContext, path, format)
+                                if (preview != null) {
+                                    pendingPreview.value = preview
+                                    Log.i(TAG, "preview ready: ${preview.fileName} format=${preview.format} parsed=${preview.cards.size}")
+                                }
+                            }
+                            else -> {
+                                if (path == null) return@launch
+                                val stats = importFromPath(ctx.applicationContext, path, format)
+                                Log.i(TAG, "broadcast import done: $stats")
+                            }
+                        }
                     }
                 }
             },
@@ -59,38 +84,62 @@ object ImportService {
 
     /** 按路径导入（广播路径 / 测试路径）。返回统计，失败记日志并返回 null。 */
     suspend fun importFromPath(context: Context, path: String, format: String? = null): ImportStats? {
+        val preview = previewFromPath(context, path, format) ?: return null
+        return persistImported(preview.format, preview.cards)
+    }
+
+    /** 只解析不入库：字段映射确认页的数据源。 */
+    fun previewFromPath(context: Context, path: String, format: String? = null): ImportPreview? {
         val file = File(path)
         if (!file.isFile) {
-            Log.w(TAG, "import: file not found: $path")
+            Log.w(TAG, "preview: file not found: $path")
             return null
         }
         val fmt = (format ?: file.extension.lowercase().ifEmpty { "txt" })
-        Log.i(TAG, "import start: path=$path format=$fmt size=${file.length()}B")
+        Log.i(TAG, "preview start: path=$path format=$fmt size=${file.length()}B")
         return try {
             val cards = when (fmt) {
                 "csv" -> CsvImporter.parse(file.readText(Charsets.UTF_8))
                 "apkg" -> parseApkg(context, file)
                 else -> TextImporter.parse(file.readText(Charsets.UTF_8))
             }
-            persist(fmt, cards)
+            ImportPreview(format = fmt, fileName = file.name, cards = cards)
         } catch (t: Throwable) {
-            Log.e(TAG, "import failed: $path ($fmt): ${t.message}", t)
+            Log.e(TAG, "preview failed: $path ($fmt): ${t.message}", t)
             null
         }
     }
 
-    /** 真机文件选择器路径：content:// Uri 先拷到缓存再按路径导入。 */
-    suspend fun importFromUri(context: Context, uri: Uri): ImportStats? {
+    /** 真机文件选择器路径：解析为预览并发布到 pendingPreview，由书房面板确认页接管。 */
+    suspend fun previewFromUri(context: Context, uri: Uri) {
         val name = queryDisplayName(context, uri) ?: "import.csv"
         val tmp = File(context.cacheDir, "import_${System.currentTimeMillis()}_$name")
-        return try {
+        try {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 tmp.outputStream().use { input.copyTo(it) }
-            } ?: return null.also { Log.w(TAG, "import: cannot open $uri") }
-            importFromPath(context, tmp.absolutePath, format = null)
+            } ?: run { Log.w(TAG, "preview: cannot open $uri"); return }
+            val preview = previewFromPath(context, tmp.absolutePath)
+            if (preview != null) {
+                pendingPreview.value = preview.copy(fileName = name)
+                Log.i(TAG, "preview ready: ${name} format=${preview.format} parsed=${preview.cards.size}")
+            }
         } finally {
             tmp.delete()
         }
+    }
+
+    /** 确认页点「确认导入」：把预览卡片入库并清空待确认态。 */
+    suspend fun confirmImport(): ImportStats? {
+        val preview = pendingPreview.value ?: return null
+        val stats = persistImported(preview.format, preview.cards)
+        pendingPreview.value = null
+        Log.i(TAG, "confirm import done: $stats")
+        return stats
+    }
+
+    fun cancelPreview() {
+        pendingPreview.value = null
+        Log.i(TAG, "preview canceled")
     }
 
     private fun queryDisplayName(context: Context, uri: Uri): String? {
@@ -124,7 +173,7 @@ object ImportService {
     }
 
     /** 按 front 去重后批量入库。 */
-    private suspend fun persist(fmt: String, cards: List<ImportedCard>): ImportStats {
+    suspend fun persistImported(fmt: String, cards: List<ImportedCard>): ImportStats {
         val existing = DataGraph.repository.cards.first().map { it.front }.toHashSet()
         var imported = 0
         var dup = 0

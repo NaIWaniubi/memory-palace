@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.data.ImportPickerActivity
+import com.memorypalace.data.ImportService
 import com.memorypalace.probe.DualStateController
 import com.memorypalace.probe.DualStateProbe
 import com.memorypalace.review.ReviewSession
@@ -59,11 +62,12 @@ fun StudyPanel() {
         }
 
         MpText(
-            "导入（M5）：支持 CSV / 纯文本 / Anki .apkg，离线解析。无头：adb push 后 " +
-                "am broadcast -a com.memorypalace.card.IMPORT --es path /sdcard/…",
+            "导入（M5/M8）：支持 CSV / 纯文本 / Anki .apkg，离线解析。真机走「导入牌组」选文件 → 此处出字段映射确认页；无头直导：card.IMPORT --es path …",
             fontSize = 13.sp,
             color = Color(0xFF9AA3B2),
         )
+
+        ImportConfirmView()
 
         MpText(
             "无头驱动（模拟器点不了空间按钮时用）：adb shell am broadcast -a com.memorypalace.dualstate.OPEN_STAGE / CLOSE_STAGE / TOGGLE_REVIEW_CARD",
@@ -153,6 +157,38 @@ fun DueQueueView() {
                 fontSize = 12.sp,
                 color = Color(0xFF9AA3B2),
             )
+        }
+    }
+}
+
+/** 字段映射确认页（M8）：SAF/预览广播解析出 pendingPreview 后在此确认入库。 */
+@Composable
+fun ImportConfirmView() {
+    val preview by ImportService.pendingPreview.collectAsState()
+    val scope = rememberCoroutineScope()
+    val p = preview ?: return
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        MpText(
+            "导入确认：${p.fileName}（格式 ${p.format}，解析 ${p.cards.size} 条）",
+            fontSize = 20.sp,
+            fontWeight = FontWeight(700),
+            color = Color(0xFF7CD4FD),
+        )
+        MpText("字段映射：正面 → 背面，预览前 5 条：", fontSize = 14.sp, color = Color(0xFF9AA3B2))
+        p.cards.take(5).forEach { c ->
+            MpText("· ${c.front} → ${c.back}", fontSize = 14.sp)
+        }
+        if (p.cards.size > 5) {
+            MpText("…还有 ${p.cards.size - 5} 条", fontSize = 13.sp, color = Color(0xFF9AA3B2))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { scope.launch { ImportService.confirmImport() } }) {
+                MpText("确认导入", fontSize = 14.sp)
+            }
+            Button(onClick = { ImportService.cancelPreview() }) {
+                MpText("取消", fontSize = 14.sp)
+            }
         }
     }
 }
