@@ -600,6 +600,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 1. **搜索工具可靠性**：本次调研中，内置 WebSearch 工具多次返回**不可访问或不存在的 URL**（如 `supermemo.com/en/blog/sm-2`、`ikea-place-app` 服务页、`arlopa-ar-platform` 体验页、`ar-lens.com`）。**所有进入本文件的链接均经 `curl` 状态码校验**，检索工具给出的错误链接已全部在「已排除候选」中记录并替换为实际可访问的等价取证源。
 2. **商店反爬限制**：Meta Store 深链裸 curl 返回 400，PICO 全球商店站返回 000。这两处依赖 WebFetch 渲染 + 5thscape / SideQuest 第三方元数据镜像（元数据来源由该站明示为 Meta Store）。**5thscape 转述的价格、评分、发行日未经原始商店页二次确认**，本文在引用时已注明出处。
 3. **平台覆盖缺口**：Horizon Worlds 教育内容、iOS App Store 竞品（iTunes API 在本次会话中不可达）、Rec Room 教育空间、VRChat 内部世界**未能取得一手取证**，其中仅 VRChat 通过官方 Wiki 取得了间接证据。这几处**可能存在未被发现的同类产品**，自评时应保留此余量。
+4. **PICO 官方商店仍未覆盖（2026-11-09 复测）**：`store-global.pico-store.com` 连接失败（curl 000）；`appstore-cn.picoxr.com/api/app/v1/search` 对**所有关键词**返回 `{"code":10000,"msg":"internal error"}` —— 包括必然有结果的对照词 `tetris` / `game` / `Anki`，故属 **API 在本网络环境整体不可用**，**不能据此断定无此类应用**。这是当前唯一未闭合的平台缺口，11/13 前需换网络环境或人工浏览商店 Web 端补查。
 4. **信息时效**：检索日期为 **2026-11-09**。商店上架状态、版本、评分随时变动，正式提交前建议对 Meta Store 与 PICO Store 的 3 款 XR 竞品（LOCI、SpatialFlashcards、ThingLink XR）再做一次复核。
 
 
