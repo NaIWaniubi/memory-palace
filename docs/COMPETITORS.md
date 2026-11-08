@@ -143,7 +143,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 |---|---|---|---|---|---|---|---|
 | 1 | **Loci: The Language Learning Memory Palace** | Meta Quest（MR，Presence Platform） | [devpost.com/software/language-learning-memory-palace](https://devpost.com/software/language-learning-memory-palace) | 语音生成闪卡 → 用 spatial anchor 钉进真实房间 → 练习时指认 | **是** | **否** | [devpost](https://devpost.com/software/language-learning-memory-palace) |
 | 2 | **LOCI — Memory Palace Trainer** | Meta Quest 2 / Pro / 3 / 3S | [meta.com/experiences/loci-memory-palace-trainer](https://www.meta.com/experiences/loci-memory-palace-trainer/1262691056918468/) | 在虚拟宫殿地标处放置物件 → 延迟后指回原位，答对则宫殿扩张 | **否** | **否** | [5thscape 镜像](https://5thscape.com/gameverse/loci-memory-palace-trainer/) · [官方页](https://loci-memory-palace.vercel.app/) |
-| 3 | **SpatialFlashcards** | Meta Quest 2 / Pro / 3 / 3S（Mixed Reality） | [meta.com/experiences/spatialflashcards](https://www.meta.com/experiences/spatialflashcards/8075068299221418/) | 把物理卡片的「空间记忆」做成游戏；配对/翻卡两种模式 + 可导入 Quizlet / Knowt | **部分** | **否** | [5thscape 镜像](https://5thscape.com/gameverse/spatialflashcards/) · [SideQuest](https://sidequestvr.com/app/35002/spatialflashcards) |
+| 3 | **SpatialFlashcards** | Meta Quest 2 / Pro / 3 / 3S（Mixed Reality） | [meta.com/experiences/spatialflashcards](https://www.meta.com/experiences/spatialflashcards/8075068299221418/) | 把物理卡片的「空间记忆」做成游戏；配对/翻卡两种模式 + 可导入 Quizlet / Knowt | **否**（2026-11-09 复核：官方描述原文为卡片落在 virtual flashcard 上，passthrough 仅作背景；**原判「部分」，下调为「否」**） | **否** | [5thscape 镜像](https://5thscape.com/gameverse/spatialflashcards/) · [SideQuest](https://sidequestvr.com/app/35002/spatialflashcards) |
 | 4 | **Loci: Memory Training** | 手机（iOS / Android） | [play.google.com/…/com.loci.recall](https://play.google.com/store/apps/details?id=com.loci.recall) | 手机上的记忆宫殿训练器：造宫殿 → 定点放置 → 走宫殿回忆，配 SRS 提醒 | **否** | **是** | [Play](https://play.google.com/store/apps/details?id=com.loci.recall) |
 | 5 | **Mind Palace: Memory Trainer** | 手机（iOS / Android） | [play.google.com/…/com.element.mind_palace](https://play.google.com/store/apps/details?id=com.element.mind_palace) | 生成式 AI 造 surreal 宫殿，自动把事实 pin 到物件上 | **否** | **是** | [Play](https://play.google.com/store/apps/details?id=com.element.mind_palace) |
 | 6 | **Mindhall: Memory Palace Notes** | 手机 + 桌面（Web） | [play.google.com/…/com.mindhall.app](https://play.google.com/store/apps/details?id=com.mindhall.app) | 笔记写进「房子平面图」的地点；走图回忆；`==词==` 自动成卡 | **否** | **是** | [Play](https://play.google.com/store/apps/details?id=com.mindhall.app) |
@@ -170,10 +170,10 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 **统计口径**
 
 - 收录竞品总数：**25 款**
-- 「空间锚定实物家具」= **是**：**3 款**（① Loci Devpost 原型、⑲ Halo AR、⑳ IKEA Place — 其中 IKEA Place 的锚定用于购物试摆而非学习）；= **部分**：**4 款**（③ SpatialFlashcards、⑬ Noun Town、⑱ ARLOOPA、㉑ ThingLink XR）
+- 「空间锚定实物家具」= **是**：**3 款**（① Loci Devpost 原型、⑲ Halo AR、⑳ IKEA Place — 其中 IKEA Place 的锚定用于购物试摆而非学习）；= **部分**：**3 款**（⑬ Noun Town、⑱ ARLOOPA、㉑ ThingLink XR；**③ SpatialFlashcards 于 2026-11-09 由「部分」下调为「否」**）
 - 「遗忘曲线调度」= **是**：**9 款**（④ Loci 手机版、⑤ Mind Palace、⑥ Mindhall、⑦ MnemoPal、⑧ Art of Memory、⑨ Anki、⑩ SuperMemo、⑬ Noun Town、㉓ Quizlet）；= **部分**：**3 款**（⑪ Mondly VR、㉔ Memrise、㉕ Duolingo）
 - **同时满足「空间锚定 = 是」且「遗忘曲线调度 = 是」：0 款**（**这是本调研最重要的统计结论**）
-- **空间锚定 = 是 或 部分，且在 XR / MR 头显上运行：3 款**（① Loci Devpost 原型、③ SpatialFlashcards、⑬ Noun Town），**三者全部没有遗忘曲线调度**
+- **空间锚定 = 是 或 部分，且在 XR / MR 头显上运行：2 款**（① Loci Devpost 原型、⑬ Noun Town；③ SpatialFlashcards 下调后移出），**两者全部没有遗忘曲线调度**
 
 ---
 
@@ -206,10 +206,10 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 
 - **平台**：Meta Quest 2 / Quest Pro / Quest 3 / Quest 3S（发布 2024-07-30，更新至 2026-10-31，版本 1.12，开发者 OdachiVR，$1.99，Mixed Reality）
 - **核心机制**：把物理卡片的「空间记忆优势」搬到 VR，用配对与翻卡两种记忆游戏呈现，可自建卡组或从 Quizlet / Knowt 导入；**仅支持纯文本卡片**
-- **空间锚定实物家具**：**部分**。商店标注 Reality Type = Mixed Reality 且支持 passthrough，但商品描述**未查证到**卡片可绑定到真实家具/表面
+- **空间锚定实物家具**：**否**（2026-11-09 复核下调）。商店标注 Reality Type = Mixed Reality 且支持 passthrough，但**官方描述原文明确卡片落在 virtual flashcard 上，passthrough 仅作背景** —— 不是"绑定到真实家具表面"。**原判「部分」是因为当时只有商店元数据、未读到描述正文；本次补齐正文后下调。**
 - **遗忘曲线调度**：**否**。**未查证到**任何排程或记忆模型；只有游戏化配对/翻卡
 - **取证**：https://5thscape.com/gameverse/spatialflashcards/ · https://sidequestvr.com/app/35002/spatialflashcards · https://www.meta.com/experiences/spatialflashcards/8075068299221418/
-- **对我方意义**：证明「VR 里做闪卡」本身不新；且其**只支持纯文本卡片、依赖外部卡组导入**。**我方「把 Anki/apkg 牌组 + 空间音频 + 锚点持久化」组合起来仍无人做。**
+- **对我方意义**：证明「VR 里做闪卡」本身不新；且其**只支持纯文本卡片、依赖外部卡组导入**。**我方「把 Anki/apkg 牌组 + 空间音频 + 锚点持久化」组合起来仍无人做。** 补齐正文后其「家具锚定」判定反而更弱，我方差异化强度略微上升。
 
 #### ㉑ ThingLink XR for PICO
 
@@ -438,6 +438,8 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 | **Rec Room 内的学习空间** | 同 Rec Room 条。**已排除：无产品内容** |
 | **PICO 官方 Spatial 生态中的教育类 SRS 应用** | PICO 生态教育类应用仅查证到 **ThingLink XR for PICO**（企业培训内容分发，见对比表第 21 款）与 **VRChat 的 PICO 独立版**（社区 UGC）。**未查证到**任何做「个人学习 + 间隔重复 + 空间锚定」的 PICO 原生应用。**已排除：不存在该产品形态** |
 | **学术原型「Cognitive Load-Driven VR Memory Palaces」等论文原型** | 检索命中 arXiv / Springer / ResearchGate 的论文条目，但本次调研的判定标准是**可获取的产品**（能被用户实际安装使用）。论文原型无法安装、不构成竞品，仅作为「VR 记忆宫殿研究存在多年但无商品化」的存在性证据。**已排除：非可获取产品** |
+| **Anki 3D / Anki 3D Immersive Flashcards** | **产品不存在（名称撞车）**。域名 `anki3d.com` **从未注册** —— Cloudflare DoH 返 NXDOMAIN、Verisign RDAP 返 404（对照组 example.com 返 200）、Wayback CDX 返 0 条快照（对照组 ankiweb.net 返 3 条），三重取证且各带对照；外部代理 `r.jina.ai` 返 422「Domain could not be resolved」。SideQuest 官方后端 API 全库检索 5 组关键词（`anki` / `Anki 3D` / `Anki3D` / `anki 3d` / `immersive flashcards`）**全部 0 命中**（`flashcard` 只命中 SpatialFlashcards）；Steam / Google Play / App Store / itch.io / VRDB / GitHub 全库检索亦 0 命中，中文渠道（小米商店 / 豌豆荚 / cn.bing）零命中。**"Anki 3D" 真实指向 AnKi 3D Engine**（`anki3d.org`，Vulkan/DX12 开源游戏引擎，1,628★）—— 与闪卡、间隔重复、XR 无关，把它算进竞品是类别错误。**已排除：产品不存在**（详细取证见 `docs/COMPETITOR-ANKI3D.md`） |
+| **AnkiApp VR**（Anki 官方，Oculus Go 时代） | Anki 官方 Medium 公告的 `web.ankiapp.com` 网页客户端，仅面向 Oculus Browser，已停更；2D 网页形态，**无空间锚定、无空间音频**，Anki 调度经 AnkiWeb 间接实现但与空间完全解耦。**已排除：非 XR 原生、已停更** |
 
 ---
 
@@ -450,7 +452,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 | | **无遗忘曲线调度** | **有遗忘曲线调度** |
 |---|---|---|
 | **无真实空间锚定**（虚拟场景 / 2D 屏幕） | ② LOCI、⑪ Mondly VR、⑫ IMMERSE、⑭ VR4LL、⑮ VR Memory Palace、⑯ Memory Palace VR™、⑰ memoryOS、㉔ Memrise、㉕ Duolingo | ④ Loci 手机版、⑤ Mind Palace、⑥ Mindhall、⑦ MnemoPal、⑧ Art of Memory、⑨ Anki、⑩ SuperMemo、㉓ Quizlet |
-| **有真实空间锚定**（MR / AR，含「部分」） | ① Loci Devpost 原型、③ SpatialFlashcards、⑱ ARLOOPA、⑲ Halo AR、⑳ IKEA Place、㉑ ThingLink XR | **← 本次调研 25 款竞品中：无一款落在此格** |
+| **有真实空间锚定**（MR / AR，含「部分」） | ① Loci Devpost 原型、⑱ ARLOOPA、⑲ Halo AR、⑳ IKEA Place、㉑ ThingLink XR | **← 本次调研 25 款竞品中：无一款落在此格** |
 
 > **右上格为空**，这就是我方的立足点。左侧两格各有成熟产品，但**没有产品跨越这道墙**。
 >
@@ -508,44 +510,50 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 | ⑨ Anki / ⑦ MnemoPal —— 算法与导入 | **中** | 定位为继任者而非竞品；强调空间化执行层 |
 | ③ SpatialFlashcards / ⑲ Halo AR —— 实物表面锚定 | **低-中** | 强调「锚定用于排程执行」而非「锚定用于展示/发布」 |
 | ⑬ Noun Town —— Quest MR + spaced repetition 组合最接近 | **中** | 强调其锚定对象是「虚拟小镇」而非「真实家具」 |
-| **⓪ Anki 3D: Immersive Flashcards（Meta Quest）—— 检索摘要称"锚定到真实家具 + Anki 原生调度"** | **待定（可能为高）** | **⚠ 见 §5.3b：取证未完成，按最坏情况准备** |
+| ~~⓪ Anki 3D~~ | **已证伪，不构成风险** | 产品不存在（域名从未注册 + 七个商店全库 0 命中）。详见 §四「已排除候选」与 `docs/COMPETITOR-ANKI3D.md` |
 
-### 5.3b Anki 3D —— 未完成取证的已知风险（2026-11-09 追加）
+### 5.3b Anki 3D 线索 —— 已证伪（2026-11-09 追加取证）
 
-**这不是 §2 主对比表里的一行，因为取证没完成。** 单独列出来，因为它是目前唯一可能推翻「右上象限为空」这个核心结论的产品。
+**这一节保留，因为它记录了一个方法论教训：检索摘要会凭空造出产品。**
 
-**检索层看到的信息**（**注意：这些是搜索工具生成的摘要，不是页面原文**）：
+**最初的情况**：补查竞品时，检索摘要给出「Anki 3D: Immersive Flashcards（Meta Quest）」，并描述其能力为「锚定到真实表面与家具 + 沿用 Anki 间隔重复排程」。若属实，这是唯一能推翻「右上象限为空」这个核心结论的产品。
 
-- 产品名 **Anki 3D / Anki 3D: Immersive Flashcards**，Meta Quest 平台，SideQuest 有收录
-- 摘要称其能力：把交互式 3D 对象放在房间里、**锚定到真实表面与家具**、把 Anki 闪卡附在对象上、支持导入现有 Anki 牌组、沿用 Anki 的间隔重复排程
-- 社区反馈：3D 场景与 passthrough 对空间类科目（解剖、器械、地理）有价值，纯文字牌组则"更像新鲜感"
+**当时的处置**：按纪律不能把摘要当正文，但也不能装作没看见 —— 于是**按最坏情况准备**（创新分下调到 14–17 的话术、话术改法、四条区隔点全部写好），同时继续取证。
 
-**取证为什么没完成**（本机网络环境限制，已实测）：
+**取证结论**：**产品不存在。** 三重独立验证，每条都带对照组证明通道本身正常：
 
-| 目标 | 状态 | 实测 |
+| 验证 | 结果 | 对照组 |
 |---|---|---|
-| `anki3d.com` | ❌ 连接失败 | curl `http=000` |
-| Meta Store 深链 | ❌ 400 | curl `http=400`（Meta 对无 cookie 的裸请求返回 400） |
-| SideQuest 搜索 | ❌ 连接失败 | curl `http=000` |
-| DuckDuckGo HTML 端 | ❌ 连接失败 | curl `http=000` |
-| 检索工具摘要 | ⚠️ 有但非原文 | 摘要由模型生成，与页面正文的冲突以正文为准 —— 本次拿不到正文 |
+| Cloudflare DoH 解析 `anki3d.com` | **NXDOMAIN**（`.com` 下无此名） | — |
+| Verisign RDAP 注册局查询 | **HTTP 404** | `example.com` → HTTP 200 |
+| Wayback CDX 快照 | **0 条** | `ankiweb.net` → 3 条（2013 年起） |
+| 外部代理解析 `r.jina.ai` | **HTTP 422**「Domain could not be resolved」 | — |
 
-**按纪律，我们不能把"检索摘要说的"当成"已验证的"。** 但也不能装作没看见。
+**应用商店全库检索**（逆向出 SideQuest 官方后端 API `api.sidequestvr.com/v2/apps` 做全量检索，而非看搜索页）：
 
-**因此按最坏情况准备（这才是有用的部分）**：
-
-| 若 Anki 3D 确实做到「家具锚定 + Anki 原生调度」 | 影响 | 我们的应对（现在就写好） |
+| 商店 | 关键词 | 命中 |
 |---|---|---|
-| 创新分 | **18–21 → 14–17** | 主动引用它。区隔点从"组合无人做过"改为"**我们把三件事做到可验证**"：① 锚定持久性有实测数据（drift 0.0m，2026-11-09 复核）② 记忆强度驱动**空间外观**而非只排期 ③ **空间音频方位引导**（它的摘要里没提）④ core 算法零 SDK 依赖、可纯 JVM 单测 42 例 ⑤ Apache-2.0 开源 |
-| 差异化主张 | 失去"组合无人做过" | 改为"**同一件事我们做得更完整**"：它做空间化闪卡，我们做空间化**记忆系统**（遗忘曲线 → 外观 → 通知 → 复习闭环） |
-| 路演话术 | 需改 | 不说"首创"，说"我们把 MR 闪卡和遗忘曲线打通了，并且每个环节都有证据"。**主动披露永远优于被动挨问** |
+| SideQuest 全库 | `anki` / `Anki 3D` / `Anki3D` / `anki 3d` / `immersive flashcards` | **5 组全部 0 命中** |
+| SideQuest 全库 | `flashcard` | 1 条：SpatialFlashcards（id 35002，ŌdachiVR） |
+| Steam / Play / App Store / itch.io / VRDB / GitHub | `anki 3d` / `anki vr` / `flashcard vr` | **0 命中** |
+| 中文渠道（小米商店 / 豌豆荚 / cn.bing） | `"Anki 3D" VR 闪卡` | **0 命中** |
 
-**未受影响的部分（这是我们的地板）**：
-- **空间音频方位引导**：即使 Anki 3D 全中，它的检索摘要里也**没有**提到空间音频 —— 这一项仍是零覆盖
-- **可验证性**：42 例可复现单测 + 锚定漂移实测 + Apache-2.0 开源，Anki 3D 的社区反馈里没有任何一项对应的公开证据
-- **PICO 生态**：Anki 3D 是 Quest 应用；PICO 侧仍只查到 ThingLink XR 与 VRChat UGC
+**"Anki 3D" 真实指向**：**AnKi 3D Engine**（`anki3d.org`）—— 一个 Vulkan/DX12 开源游戏引擎（GitHub 1,628★），与闪卡、间隔重复、XR 无关。把它算进竞品是类别错误。「漏网之鱼」传闻的来源很可能就是：检索者只看到 "Anki 3D" 四个字就误记成 VR 闪卡 App。
 
-**下一步**：① 用能出海的代理/换网络重试取证；② 若拿不到正文，在答辩时**主动**提"Anki 3D 也在做空间化闪卡，我们和它的差别是……"，把主动权拿在自己手里；③ 补查 PICO 商店原生应用（§5.4 已知缺口）。
+**附带发现**：任务线索里给的 `sidequest.com` 是 **Bodis 停放域名**，真实站是 `sidequestvr.com`。前者拼接出的 `/en-us/app/<slug>` 路径是 AI 检索摘要的 URL 模式幻觉。
+
+**对创新分的影响：不下调，维持 18–21。** 「家具锚定 + 遗忘曲线同时成立」的竞品仍是 **0 款**。
+
+**唯一调整**：SpatialFlashcards 的「锚定」由 *部分 → 否*（其官方描述原文：卡片落在 virtual flashcard 上，passthrough 仅作背景）—— 这**反而略微抬高**我方差异化强度。
+
+**本次取证的产出是"证伪一条假线索"** —— 避免在评审材料里引用一个不存在的竞品，或拿一个游戏引擎充当竞品。这是**减少**风险，不是增加。
+
+**方法论教训（写给未来的自己）**：
+1. 检索摘要会**凭空造出**产品、URL 和功能描述 —— 当摘要与"域名是否注册"这类可机械验证的事实冲突时，**以机械验证为准**
+2. 应用商店要**全库检索**（API 直查），不是看搜索页 —— 搜索页本身就是摘要的产物
+3. 每一项"不可达"都要有**对照组**证明不是通道坏了：`example.com` 能 RDAP 200、`ankiweb.net` 能 CDX 返 3 条，才能说 `anki3d.com` 的 404 与 0 条是真结论
+
+**仍未闭合的缺口**（见 `docs/COMPETITOR-ANKI3D.md` §5）：PICO Store 全库检索 API 在本网络环境下整体不可用（对照组词同样 internal error，**不能据此断定无此类应用**）；Meta Store 原生搜索未完成（结论依赖 5thScape 镜像）；SpatialFlashcards / LOCI 的真机态未验证（持久化、是否真用系统锚点、空间音频三项）；两个 Reddit 关键讨论帖正文 403 未取到。
 
 ---
 
