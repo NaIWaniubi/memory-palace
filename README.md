@@ -20,12 +20,19 @@
 > 前置：已安装 [PICO CLI](https://developer.picoxr.com/document/pico-cli/) 与 PICO Emulator
 
 ```bash
+# 0. 告诉 Gradle Android SDK 在哪（local.properties 不进版本库，各机路径不同）
+echo "sdk.dir=/path/to/your/Android/sdk" > local.properties
+
 pico-cli emulator start --avd Pico_Emulator_6_1   # 1. 启动 PICO 模拟器
 ./gradlew installDebug                            # 2. 构建并安装
 pico-cli app launch                               # 3. 启动应用
 ```
 
 约 12 秒后三窗出现（模拟器实测，x86 转译；真机 arm64 原生更快）。首次启动会自动导入三套示例牌组（50 张），开箱即可复习。
+
+**本仓库已在干净克隆下验证**（2026-11-09）：`git clone` → `:core:test` 42 例全绿 → `:app:assembleDebug` 产出 30 MB APK。克隆耗时 52 秒。
+
+只跑算法单测不需要 Android SDK：`./gradlew :core:test`（`core/` 是纯 JVM 模块，零 SDK 依赖）。
 
 ## 功能矩阵
 
