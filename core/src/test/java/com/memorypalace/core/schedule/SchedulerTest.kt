@@ -68,4 +68,70 @@ class SchedulerTest {
         val queue = Scheduler.dueQueue(listOf(future, justDue, overdue), t0)
         assertEquals(listOf("b", "a"), queue.map { it.id })
     }
+
+    @Test
+    fun `empty queue stays empty`() {
+        assertTrue(Scheduler.dueQueue(emptyList(), t0).isEmpty())
+    }
+
+    @Test
+    fun `新卡立即进入到期队列`() {
+        val c = Scheduler.newCard("new", "f", "b", t0)
+        assertEquals(listOf("new"), Scheduler.dueQueue(listOf(c), t0).map { it.id })
+    }
+
+    @Test
+    fun `记住后间隔按 easiness 增长`() {
+        var c = Scheduler.newCard("a", "f", "b", t0)
+        c = Scheduler.review(c, Grade.REMEMBERED, t0)
+        c = Scheduler.review(c, Grade.REMEMBERED, c.dueAt)
+        // 第三次：6 * 2.5 = 15 天
+        c = Scheduler.review(c, Grade.REMEMBERED, c.dueAt)
+        assertEquals(15.0, c.intervalDays, 1e-9)
+        // 第四次：15 * 2.5 = 37.5 → 取整 38（roundToLong）
+        c = Scheduler.review(c, Grade.REMEMBERED, c.dueAt)
+        assertEquals(38.0, c.intervalDays, 1e-9)
+    }
+
+    @Test
+    fun `遗忘后重新记住回到一天间隔`() {
+        var c = Scheduler.newCard("a", "f", "b", t0)
+        c = Scheduler.review(c, Grade.REMEMBERED, t0)
+        c = Scheduler.review(c, Grade.REMEMBERED, c.dueAt)
+        c = Scheduler.review(c, Grade.FORGOTTEN, c.dueAt)
+        assertEquals(0, c.repetitions)
+        c = Scheduler.review(c, Grade.REMEMBERED, c.dueAt)
+        assertEquals(1, c.repetitions)
+        assertEquals(1.0, c.intervalDays, 1e-9)
+    }
+
+    @Test
+    fun `重学延迟把卡片排除出立即到期队列`() {
+        var c = Scheduler.newCard("a", "f", "b", t0)
+        c = Scheduler.review(c, Grade.FORGOTTEN, t0)
+        // 10 分钟内不回到队列里
+        assertTrue(Scheduler.dueQueue(listOf(c), t0 + Scheduler.RELEARN_DELAY_MILLIS - 1000).isEmpty())
+        // 超过 10 分钟后回到队列
+        assertEquals(1, Scheduler.dueQueue(listOf(c), t0 + Scheduler.RELEARN_DELAY_MILLIS + 1000).size)
+    }
+
+    @Test
+    fun `easiness 记住时也会下降符合 SM2 公式`() {
+        var c = Scheduler.newCard("a", "f", "b", t0)
+        val before = c.easiness
+        c = Scheduler.review(c, Grade.REMEMBERED, t0)
+        // q=4：ef' = ef + (0.1 - (5-4)*(0.08 + (5-4)*0.02)) = ef + (0.1 - 0.1) = ef
+        assertEquals(before, c.easiness, 1e-9)
+    }
+
+    @Test
+    fun `连续记住间隔单调不减`() {
+        var c = Scheduler.newCard("a", "f", "b", t0)
+        var last = 0.0
+        repeat(6) {
+            c = Scheduler.review(c, Grade.REMEMBERED, c.dueAt)
+            assertTrue("间隔应单调不减：${c.intervalDays} < $last", c.intervalDays >= last)
+            last = c.intervalDays
+        }
+    }
 }

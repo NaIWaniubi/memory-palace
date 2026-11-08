@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.memorypalace.anchor.AnchorScene
+import com.memorypalace.audio.SpatialCue
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.data.ImportPickerActivity
@@ -144,6 +145,7 @@ fun DueQueueView() {
     val tick by Clock.tick.collectAsState()  // 时间机器快进后到期队列要重算
     val due = remember(cards, tick) { DataGraph.repository.dueQueue(cards) }
     val session by ReviewSession.state.collectAsState()
+    val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(MpSpace.Sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
@@ -178,6 +180,25 @@ fun DueQueueView() {
         }
         if (due.size > 6) {
             MpText("…还有 ${due.size - 6} 张", fontSize = MpType.Caption, color = MpColors.TextSecondary)
+        }
+        // M13：方位引导演示入口 —— 从第一张到期卡的锚点位置发提示音，
+        // 用户转头就能定位它。卡片必须已钉入房间才有空间位置。
+        val firstDue = due.firstOrNull()
+        if (firstDue != null) {
+            val anchored = AnchorScene.records.value.any { it.key == firstDue.id }
+            Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
+                Button(onClick = {
+                    scope.launch { SpatialCue.cueCardDue(firstDue.id) }
+                }) {
+                    MpText("🔊 播报方位", fontSize = MpType.Caption)
+                }
+                MpText(
+                    if (anchored) "从「${firstDue.front}」的锚点位置发声"
+                    else "「${firstDue.front}」尚未钉入房间，先点「钉入房间」再播报",
+                    fontSize = MpType.Caption2,
+                    color = if (anchored) MpColors.Success else MpColors.Warning,
+                )
+            }
         }
         if (cards.isEmpty()) {
             MpText(

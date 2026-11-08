@@ -13,13 +13,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.memorypalace.anchor.AnchorRecord
 import com.memorypalace.core.model.Card
-import com.memorypalace.core.schedule.Scheduler
+import com.memorypalace.core.schedule.MemoryStrength
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.review.ReviewSession
 import com.pico.spatial.ui.design.Button
 import com.pico.spatial.ui.design.Text
-import kotlin.math.max
 
 /**
  * 钉在空间锚点上的知识卡。
@@ -38,8 +37,9 @@ fun AnchorCard(rec: AnchorRecord) {
     val now = Clock.now()
 
     // 记忆强度 → 外观：逾期时长 / 间隔 = 遗忘程度（0=刚到期，1=彻底褪色）
-    val fade = memoryFade(card, now)
-    val baseAlpha = 1f - 0.7f * fade
+    // 计算逻辑在 core/MemoryStrength（M13 下沉，纯 JVM 可单测），这里只做映射
+    val fade = MemoryStrength.fade(card, now)
+    val baseAlpha = MemoryStrength.alpha(fade)
 
     val isCurrent = session?.current?.id == rec.key
     val inReview = session != null
@@ -51,8 +51,8 @@ fun AnchorCard(rec: AnchorRecord) {
 
     val titleColor = when {
         isCurrent -> MpColors.Info
-        fade > 0.66f -> MpColors.FadedDeep
-        fade > 0.33f -> MpColors.FadedMid
+        MemoryStrength.tier(fade) == MemoryStrength.Tier.DEEP -> MpColors.FadedDeep
+        MemoryStrength.tier(fade) == MemoryStrength.Tier.MID -> MpColors.FadedMid
         else -> Color.White
     }
 
@@ -68,7 +68,7 @@ fun AnchorCard(rec: AnchorRecord) {
         if (card != null) {
             Text(card.back, fontSize = MpType.Body, color = titleColor.copy(alpha = 0.85f))
             Text(
-                memoryLabel(card, now, fade),
+                MemoryStrength.label(card, now, fade),
                 fontSize = MpType.Caption,
                 color = if (fade > 0f) MpColors.Warning else MpColors.Success,
             )
@@ -84,26 +84,5 @@ fun AnchorCard(rec: AnchorRecord) {
                 Text("复习这张", fontSize = MpType.BodySmall)
             }
         }
-    }
-}
-
-/** 遗忘程度 0..1：未到期=0；逾期满一个间隔=1（彻底褪色）。 */
-private fun memoryFade(card: Card?, now: Long): Float {
-    if (card == null) return 0f
-    val overdue = now - card.dueAt
-    if (overdue <= 0) return 0f
-    val intervalMillis = max(card.intervalDays, 1.0) * Scheduler.DAY_MILLIS
-    return (overdue / intervalMillis).coerceIn(0.0, 1.0).toFloat()
-}
-
-private fun memoryLabel(card: Card, now: Long, fade: Float): String {
-    val overdueDays = (now - card.dueAt).toDouble() / Scheduler.DAY_MILLIS
-    return when {
-        overdueDays <= 0 -> {
-            val left = -overdueDays
-            "记得牢 · ${if (left < 1) "今天" else "${left.toInt()}天后"}到期 · 间隔${card.intervalDays.toInt()}d"
-        }
-        fade >= 1f -> "已逾期${overdueDays.toInt()}天 · 快忘了"
-        else -> "已逾期${if (overdueDays < 1) "不到1" else overdueDays.toInt().toString()}天 · 正在遗忘"
     }
 }

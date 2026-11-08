@@ -9,3 +9,56 @@
 | 日期 | 事件 | 证据 |
 |---|---|---|
 | 2026-11-07 | 仓库初始化：License、目录骨架、README | 首个 commit |
+| 2026-11-07 | M1 三窗空壳 + 双态生命周期实测封板 | [docs/DUAL-STATE-TEST.md](DUAL-STATE-TEST.md) |
+| 2026-11-07 | M2 房间锚定最小闭环（放卡→杀进程→重进→找回，漂移 0.0m） | [docs/ANCHOR-M2-TEST.md](ANCHOR-M2-TEST.md) |
+| 2026-11-07 | M3 知识卡数据层 + M4 复习流（会话状态机 + 自评调度 + 记忆强度外观） | [docs/M4-REVIEW-FLOW-TEST.md](M4-REVIEW-FLOW-TEST.md) |
+| 2026-11-07 | M5 导入管线（CSV/TXT/Anki apkg 三格式离线导入） | [docs/M5-IMPORT-PIPELINE-TEST.md](M5-IMPORT-PIPELINE-TEST.md) |
+| 2026-11-07 | M6 时间机器演示模式（一键快进 +1/+7 天 + 复位） | [docs/M6-TIME-MACHINE-TEST.md](M6-TIME-MACHINE-TEST.md) |
+| 2026-11-07 | M7 三套预置示例牌组（语言/术语/常识） | [docs/M7-PRESET-DECKS-TEST.md](M7-PRESET-DECKS-TEST.md) |
+| 2026-11-07 | M8 导入字段映射确认页（解析→确认→入库两段式） | [docs/M8-IMPORT-CONFIRM-TEST.md](M8-IMPORT-CONFIRM-TEST.md) |
+| 2026-11-07 | M9 设计规范数字化（三窗共用一套 token） | [docs/DESIGN.md](DESIGN.md) |
+| 2026-11-07 | M10 视频分镜脚本（150s 五幕 19 镜双轨） | [docs/VIDEO-STORYBOARD.md](VIDEO-STORYBOARD.md) |
+| 2026-11-07 | M11 三分钟演示路径固化（冷启动自动开三窗 / 锚卡「复习这张」/ 面板「钉入房间」） | [docs/DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) |
+| 2026-11-09 | M12 冷启动占位页（System starting window，消除 12s 黑屏）+ 时间跳转处理中提示 | `app/.../app/SplashActivity.kt` |
+| 2026-11-09 | M13 空间音频方位引导 + 记忆强度计算下沉 core（单测 16→42 例） | `app/.../audio/SpatialCue.kt`、`core/.../schedule/MemoryStrength.kt` |
+| 2026-11-09 | 文档三件套定稿（ALGORITHM / DESIGN / SCORING）+ README 同步到 M13 现状 + CI 真实化 | `docs/`、`.github/workflows/ci.yml` |
+
+## 环境基线
+
+| 组件 | 版本 |
+|---|---|
+| PICO CLI | 0.6.1（`doctor` = 0 error） |
+| PICO Emulator | 6.1.0（AVD `Pico_Emulator_6_1`） |
+| PICO Spatial SDK | 6.1.9 |
+| JDK | Corretto 21.0.12 |
+| Android SDK | Platform 35 + Sources 35 |
+
+**账号门槛：无。** 全程无账号/实名/授权门槛。
+
+## 测试现状
+
+| 层次 | 数量 | 状态 |
+|---|---|---|
+| core 单测（Scheduler） | 12 例 | ✅ 全绿 |
+| core 单测（MemoryStrength） | 19 例 | ✅ 全绿 |
+| core 单测（Importers） | 11 例 | ✅ 全绿 |
+| **合计** | **42 例** | ✅ 全绿 |
+
+CI：`.github/workflows/ci.yml` 在 GitHub Actions 跑 core 全量单测 + 三项静态检查（core 零框架依赖、manifest 有 LAUNCHER 入口、广播 action 唯一）。
+
+**app/ 模块的构建不在 CI 里跑**：它依赖 PICO Spatial SDK 私有 Maven 仓库，CI 环境无凭据。app 构建在本地验证（`./gradlew :app:assembleDebug` 通过）。这一点在 CI 文件注释里写明，不假装 CI 跑过。
+
+## 已知待验项（真机）
+
+| 项 | 原因 |
+|---|---|
+| 空间交互（多窗拖动缩放、手势） | 模拟器官方明示无法驱动 3D 空间按钮 |
+| 空间音频声场正确性 | 需真机听辨方位 |
+| SAF 文件选择器在 PICO 真机的呈现 | 模拟器无空间交互 |
+| 冷启动耗时（真机 arm64 原生应显著快于模拟器 12s） | 模拟器走 x86 转译 |
+
+## 协议与素材来源
+
+- 本项目源码：Apache-2.0
+- 官方 Sample（参考实现）：Apache-2.0（Copyright 2026 PICO），借鉴时保留其版权声明
+- 空间提示音资产：`scripts/gen_audio.py` 程序化生成，本项目原创

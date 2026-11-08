@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.memorypalace.audio.SpatialCue
 import com.memorypalace.core.model.Card
 import com.memorypalace.core.schedule.Grade
 import com.memorypalace.data.DataGraph
@@ -122,6 +123,10 @@ object ReviewSession {
             val next = s.index + 1
             state.value = if (next >= s.total) {
                 Log.i(TAG, "session complete: ${s.total} card(s) reviewed")
+                // M13：完成音从最后一张卡的锚点位置发出（没有锚点就退化为无声）
+                SpatialCue.entityOf(card.id)?.let { entity ->
+                    scope.launch { SpatialCue.play(entity, SpatialCue.CUE_DONE) }
+                }
                 null
             } else {
                 s.copy(index = next, revealed = false)

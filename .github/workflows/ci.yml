@@ -3,9 +3,54 @@ name: ci
 on: [push, pull_request]
 
 jobs:
-  repo-check:
+  # core/ 是纯 JVM 模块（零 SDK 依赖），CI 里跑全量单测。
+  # 这层是算法的守门人：调度器、导入管线、记忆强度可视化都在这里。
+  core-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder until Gradle modules land
-        run: echo "App modules not yet landed; build & unit-test job arrives with core/ module (scheduled 2026-11-10)."
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run core unit tests
+        run: ./gradlew :core:test --console=plain
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-report
+          path: core/build/reports/tests/test/
+          retention-days: 14
+
+  # app/ 依赖 PICO Spatial SDK（com.pico.spatial 仓库），CI 环境拿不到凭据，
+  # 因此 app 构建在本地/CI 之外验证；这里只做静态校验（版本目录 + 清单 + 依赖方向）。
+  # 理由与证据写在 docs/ITERATION.md，不假装 CI 跑过 app 构建。
+  app-static-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: core must not depend on Android SDK
+        run: |
+          # core 是纯 JVM：出现 android.* 或 com.pico.* import 即为违规
+          if grep -rn "^import \(android\.\|com\.pico\.\)" core/src/main/java/ ; then
+            echo "::error::core/ must stay framework-free (pure Kotlin/JVM)"
+            exit 1
+          fi
+          echo "core/ is framework-free: OK"
+      - name: app manifest has a launcher entry
+        run: |
+          grep -q 'android.intent.category.LAUNCHER' app/src/main/AndroidManifest.xml \
+            || { echo "::error::no LAUNCHER activity"; exit 1; }
+          echo "launcher entry: OK"
+      - name: every adb broadcast action is unique
+        run: |
+          # 无头驱动广播全靠 action 唯一性，重名会让两个接收器抢同一条消息。
+          # 只取 ACTION_XXX 常量的定义处，不匹配包名与调用点。
+          grep -rhoE '"com\.memorypalace\.[a-z]+\.[A-Z_]+"' app/src/main/java/ \
+            | tr -d '"' | sort | uniq -d | tee /tmp/dup.txt
+          if [ -s /tmp/dup.txt ]; then
+            echo "::error::duplicate broadcast actions:"; cat /tmp/dup.txt; exit 1
+          fi
+          echo "broadcast actions unique: OK"

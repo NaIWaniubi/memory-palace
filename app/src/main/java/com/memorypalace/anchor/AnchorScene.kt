@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.memorypalace.audio.SpatialCue
 import com.memorypalace.data.DataGraph
 import com.pico.spatial.core.math.EulerAngles
 import com.pico.spatial.core.math.Vector3
@@ -43,6 +44,29 @@ object AnchorScene {
 
     /** 当前锚定记录；RoomStage 观察它重建场景实体。 */
     val records = MutableStateFlow<List<AnchorRecord>>(emptyList())
+
+    /**
+     * 待播提示音：卡片 ID -> 提示音名。
+     * 放置确认音必须在卡片实体建出来之后才能播（空间音源挂在实体上），
+     * 而实体是 RoomStage 重建场景时才有的。所以放置时先挂这里，
+     * 由 RoomStage 注册实体后取走并播放。
+     */
+    private val pendingCues = mutableMapOf<String, String>()
+
+    /** 登记一条待播提示音；RoomStage 会在实体就绪后取走。 */
+    fun enqueueCue(cardId: String, cue: String) {
+        pendingCues[cardId] = cue
+    }
+
+    /** 取走并移除待播提示音；没有则返回 null。 */
+    fun takePendingCue(cardId: String): String? = pendingCues.remove(cardId)
+
+    /** 全部待播提示音（RoomStage 重建后统一取）。 */
+    fun drainPendingCues(): Map<String, String> {
+        val copy = pendingCues.toMap()
+        pendingCues.clear()
+        return copy
+    }
 
     fun register(context: Context) {
         store = AnchorStore(context.applicationContext)
@@ -149,6 +173,8 @@ object AnchorScene {
         }
         records.value = records.value + rec
         store.save(records.value)
+        // M13：放置确认音排队，等 RoomStage 把卡片实体建出来后再从该位置播
+        enqueueCue(cardId, SpatialCue.CUE_PLACE)
         Log.i(TAG, "record persisted key=${rec.key} uuid=${rec.uuid} total=${records.value.size}")
     }
 

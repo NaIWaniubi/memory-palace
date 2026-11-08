@@ -2,12 +2,14 @@ package com.memorypalace.ui
 
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.memorypalace.anchor.AnchorScene
+import com.memorypalace.audio.SpatialCue
 import com.memorypalace.data.Clock
 import com.memorypalace.probe.DualStateProbe
 import com.pico.spatial.core.ecs.AnchorEntity
@@ -30,6 +32,12 @@ import java.util.UUID
 fun RoomStage() {
     val instanceId = remember { DualStateProbe.claim("room_stage") }
     LifecycleLogger("room_stage", instanceId)
+
+    // M13：组合销毁时释放原生音频资源。Stage 每次进出 Full Space 都会销毁重建，
+    // 不释放就泄漏（AudioResource 是原生句柄）。
+    DisposableEffect(Unit) {
+        onDispose { SpatialCue.releaseAll() }
+    }
 
     val records by AnchorScene.records.collectAsState()
     // M6：时间机器快进时也要重建场景 —— 附件面板的 GL 纹理不随 Compose 重组自动刷新，
@@ -55,11 +63,27 @@ fun RoomStage() {
                     }
                     parent.addChild(panel)
                     content.addEntity(parent)
+                    // M13：登记卡片→实体映射，到期提示音才能从这张卡的锚点位置发声
+                    SpatialCue.registerEntity(rec.key, parent)
                     Log.i(
                         AnchorScene.TAG,
                         "scene entity added key=${rec.key} uuid=${rec.uuid ?: "fallback"} " +
                             "pos=(${rec.px},${rec.py},${rec.pz})"
                     )
+                }
+                // M13：给每张锚定卡片装空间音源（ObjectAudioComponent 由引擎做空间化渲染）
+                scope.launch {
+                    records.forEach { rec ->
+                        SpatialCue.entityOf(rec.key)?.let { entity ->
+                            SpatialCue.attach(entity)
+                        }
+                    }
+                    // 实体就绪后播排队中的提示音（如放置确认音）
+                    AnchorScene.drainPendingCues().forEach { (cardId, cue) ->
+                        SpatialCue.entityOf(cardId)?.let { entity ->
+                            scope.launch { SpatialCue.play(entity, cue) }
+                        }
+                    }
                 }
                 // 恢复一致性校验：系统解析位姿 vs 持久层保存位姿
                 scope.launch { AnchorScene.verifyRestored(records) }
