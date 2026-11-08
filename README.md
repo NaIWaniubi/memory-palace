@@ -3,7 +3,7 @@
 > 把你的房间变成记忆宫殿 —— 单词贴在冰箱上，公式贴在书桌上。
 > PICO Space Program 2026 · 最佳 PICO Spatial 空间应用赛道参赛作品 · Apache-2.0 开源
 
-![三窗架构：书房看板 + 随身复习卡 + 房间层](media/screenshots/demo_s1_coldstart_3win.png)
+![三窗架构：书房看板 + 随身复习卡 + 房间层](media/screenshots/demo_s1_coldstart_3win.jpg)
 
 *上图为 PICO Emulator 6.1 实时录制（模拟器画面，非真机）。*
 

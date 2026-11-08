@@ -27,7 +27,7 @@
 | 杀进程冷启动（新 PID） | `room database ready` + 到期队列完整恢复（Room 跨进程持久化确认）；锚点 `drift=0.0m` ×2 |
 | 答错 ubiquitous | `card reviewed id=4460df58 grade=FORGOTTEN reps=0 ef=1.96 interval=0.0d`（ef 2.50→1.96 与 SM-2 公式手算一致） |
 
-截图：`media/screenshots/m3-08-due-queue.png`（书房面板到期队列：serendipity/mnemonic 在列，ephemeral 已离队；被启动 ANR 弹窗遮挡部分区域，队列内容仍可辨）。
+截图：`media/screenshots/m3-08-due-queue.jpg`（书房面板到期队列：serendipity/mnemonic 在列，ephemeral 已离队；被启动 ANR 弹窗遮挡部分区域，队列内容仍可辨）。
 
 ## 新发现的硬约束（进方案）
 

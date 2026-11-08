@@ -42,9 +42,9 @@ Review  : session complete: 3 card(s) reviewed
 
 ### 2. 记忆强度外观（截图对比）
 
-- `m4_7_1.png` / `m4_7_3.png`：偏移 0d，锚定卡（mnemonic/ephemeral/abandon）清晰白字。
-- `m4_8_faded_7d.png`：`SET_OFFSET 7` 后同机位，卡片整体褪色变暗（fade→1，alpha→0.3）。
-- `m4_9_review_mode_room.png`：+7d 下 `review.START`（4 张到期：3 张原卡 + 忘了的 mnemonic 重学到期），书房面板到期队列由 0 堆到 4 张，非当前卡压暗。
+- `m4_7_1.jpg` / `m4_7_3.jpg`：偏移 0d，锚定卡（mnemonic/ephemeral/abandon）清晰白字。
+- `m4_8_faded_7d.jpg`：`SET_OFFSET 7` 后同机位，卡片整体褪色变暗（fade→1，alpha→0.3）。
+- `m4_9_review_mode_room.jpg`：+7d 下 `review.START`（4 张到期：3 张原卡 + 忘了的 mnemonic 重学到期），书房面板到期队列由 0 堆到 4 张，非当前卡压暗。
 
 ### 3. 生命周期
 

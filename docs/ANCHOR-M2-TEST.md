@@ -22,7 +22,7 @@
 | 5 | 恢复校验 | `verifyRestored: uuid=e71357b4-… saved=(0.5,1.3,-1.2) resolved=(0.5,1.3,-1.2) drift=0.0m` |
 | 6 | 截图 m2-04 | 与 m2-01 逐字节一致：两张卡原位重现 |
 
-截图：`media/screenshots/m2-01-anchored-full.png`（放置后）、`m2-04-after-process-restart.png`（杀进程重启后）。
+截图：`media/screenshots/m2-01-anchored-full.jpg`（放置后）、`m2-04-after-process-restart.jpg`（杀进程重启后）。
 
 ## 结论（封板）
 

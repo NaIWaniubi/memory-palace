@@ -32,7 +32,7 @@ Import  : import result: format=txt parsed=16 imported=16 skippedDup=0
 
 ### 2. 开箱到期队列（截图）
 
-- `m7_1_fresh_install_queue.png` / 裁剪 `m7_1_fresh_install_panel.png`：书房面板「**今日到期队列：50 张**」，队列列出 serendipity / ephemeral / ubiquitous / mellifluous / petrichor / luminous……新卡全部立即到期，开箱即可进入复习流。
+- `m7_1_fresh_install_queue.jpg` / 裁剪 `m7_1_fresh_install_panel.jpg`：书房面板「**今日到期队列：50 张**」，队列列出 serendipity / ephemeral / ubiquitous / mellifluous / petrichor / luminous……新卡全部立即到期，开箱即可进入复习流。
 
 ### 3. 二次启动幂等（16:24:28）
 

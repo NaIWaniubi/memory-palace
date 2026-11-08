@@ -25,7 +25,7 @@ Import  : preview start: path=…/files/import/m8_lang.csv format=csv size=187B
 Import  : preview ready: m8_lang.csv format=csv parsed=5      ← 只解析，未入库
 ```
 
-### 2. 确认页渲染（截图 m8_1_confirm_page.png）
+### 2. 确认页渲染（截图 m8_1_confirm_page.jpg）
 
 书房面板出现确认区：标题、字段映射说明、5 条正面→背面预览、「确认导入 / 取消」按钮。
 

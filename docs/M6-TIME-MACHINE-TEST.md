@@ -29,14 +29,14 @@ Anchor  : verifyRestored: … title=timetest drift=0.0m             ← 真锚�
 
 ### 2. 到期队列堆积（截图裁剪对比）
 
-- 快进前 `m6_1_before_panel.png`：**今日到期队列：14 张**，时间机器 +0 天。
-- 快进后 `m6_2_after_panel.png`：**今日到期队列：18 张**，时间机器粉色「+7 天」。
+- 快进前 `m6_1_before_panel.jpg`：**今日到期队列：14 张**，时间机器 +0 天。
+- 快进后 `m6_2_after_panel.jpg`：**今日到期队列：18 张**，时间机器粉色「+7 天」。
   （14 → 17：1d/6d 间隔卡集中到期；+1：快进行中放置的 timetest 探针卡）
 
 ### 3. 锚定卡褪色（截图裁剪对比）
 
-- 快进前 `m6_1_anchor_zoom.png`：mnemonic / ephemeral 标题清晰白色，标签「已逾期不到1天 · 正在遗忘」。
-- 快进后 `m6_2_anchor_zoom.png`：**mnemonic 灰化到几乎不可读**（fade>0.66 → 灰字 + 透明度 0.3），ephemeral 标签变为「已逾期…天 · 快忘了」。
+- 快进前 `m6_1_anchor_zoom.jpg`：mnemonic / ephemeral 标题清晰白色，标签「已逾期不到1天 · 正在遗忘」。
+- 快进后 `m6_2_anchor_zoom.jpg`：**mnemonic 灰化到几乎不可读**（fade>0.66 → 灰字 + 透明度 0.3），ephemeral 标签变为「已逾期…天 · 快忘了」。
 - 快进后立即截图可能撞上场景重建中——纹理未就绪导致卡片短暂消失（秒级），属预期重建窗口。
 
 ### 4. 复位（16:09）
@@ -46,7 +46,7 @@ Clock   : offset set to 0d (0ms)
 Anchor  : scene entity added ×4（全部恢复）
 ```
 
-- `m6_4_reset_offset0.png`：队列回落 14 张，mnemonic/ephemeral 恢复清晰白，timetest 显示绿色「记得牢·7天后到期」（它在 +7d 偏移下创建，复位后属于未到期卡）。
+- `m6_4_reset_offset0.jpg`：队列回落 14 张，mnemonic/ephemeral 恢复清晰白，timetest 显示绿色「记得牢·7天后到期」（它在 +7d 偏移下创建，复位后属于未到期卡）。
 
 ## 修复（本里程碑实测暴露）
 

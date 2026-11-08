@@ -45,7 +45,7 @@ Import  : import result: format=csv parsed=5 imported=0 skippedDup=5
 
 ### 3. 到期队列联动（截图）
 
-- `m5_3_imported_queue_panel.png`：书房面板「今日到期队列：14 张」（导入前 5 张），随身复习卡窗口提示"开始复习（取今日到期队列）"。
+- `m5_3_imported_queue_panel.jpg`：书房面板「今日到期队列：14 张」（导入前 5 张），随身复习卡窗口提示"开始复习（取今日到期队列）"。
 - 画面中 ANR 弹窗为 M4 已封板的模拟器残留面板（应用主线程在弹窗挂着的同时照常完成全部导入，日志时间戳为证）。
 
 ## 坑与结论

@@ -26,9 +26,9 @@
 | T5 | closeStage→openStage | DESTROY→**CLAIM #3** | 无任何事件 | 无任何事件 |
 
 截图证据（`media/screenshots/`）：
-- `m1-02-full-with-windows.png`：Full Space 下房间画面 + 书房面板 + 随身卡**三容器同时可见**
-- `m1-03-shared-space.png`：closeStage 后 Shared Space，双窗口仍在
-- `m1-05-cycle2-full.png`：两轮循环后书房面板仍显示「实例号 #1」、随身卡「实例号 #2」——屏上实例号与 logcat 一致
+- `m1-02-full-with-windows.jpg`：Full Space 下房间画面 + 书房面板 + 随身卡**三容器同时可见**
+- `m1-03-shared-space.jpg`：closeStage 后 Shared Space，双窗口仍在
+- `m1-05-cycle2-full.jpg`：两轮循环后书房面板仍显示「实例号 #1」、随身卡「实例号 #2」——屏上实例号与 logcat 一致
 
 ## 结论（封板）
 
