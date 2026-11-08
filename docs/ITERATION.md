@@ -22,6 +22,7 @@
 | 2026-11-09 | M12 冷启动占位页（System starting window，消除 12s 黑屏）+ 时间跳转处理中提示 | `app/.../app/SplashActivity.kt` |
 | 2026-11-09 | M13 空间音频方位引导 + 记忆强度计算下沉 core（单测 16→42 例） | `app/.../audio/SpatialCue.kt`、`core/.../schedule/MemoryStrength.kt` |
 | 2026-11-09 | 文档三件套定稿（ALGORITHM / DESIGN / SCORING）+ README 同步到 M13 现状 + CI 真实化 | `docs/`、`.github/workflows/ci.yml` |
+| 2026-11-09 | M14 头显本地到期提醒（通知通道 + 精确闹钟 + 复习后撤销） | `app/.../notify/DueNotifier.kt`、`DueReminder.kt` |
 
 ## 环境基线
 
@@ -54,6 +55,8 @@ CI：`.github/workflows/ci.yml` 在 GitHub Actions 跑 core 全量单测 + 三�
 |---|---|
 | 空间交互（多窗拖动缩放、手势） | 模拟器官方明示无法驱动 3D 空间按钮 |
 | 空间音频声场正确性 | 需真机听辨方位 |
+| 空间音频声场正确性（方位、距离衰减） | 需真机听辨 |
+| 头显通知弹窗呈现与精确闹钟能否按时触发 | 需真机；模拟器无系统通知面板 |
 | SAF 文件选择器在 PICO 真机的呈现 | 模拟器无空间交互 |
 | 冷启动耗时（真机 arm64 原生应显著快于模拟器 12s） | 模拟器走 x86 转译 |
 

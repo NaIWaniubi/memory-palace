@@ -39,6 +39,7 @@ pico-cli app launch                               # 3. 启动应用
 | CSV / TXT / Anki apkg 牌组导入 + 字段映射确认页 | ✅ 已实测 | [导入管线](docs/M5-IMPORT-PIPELINE-TEST.md) · [确认页](docs/M8-IMPORT-CONFIRM-TEST.md) |
 | 三套预置示例牌组（语言 / 专业术语 / 生活常识） | ✅ 已实测 | [预置牌组](docs/M7-PRESET-DECKS-TEST.md) |
 | 空间音频方位引导 | ⚠️ 已实现（M13），待真机验证声场 | 代码见 `app/.../audio/SpatialCue.kt` |
+| 头显本地到期提醒 | ⚠️ 已实现（M14），待真机验证弹窗 | 代码见 `app/.../notify/DueNotifier.kt` |
 | 手势 + 手柄双路径交互 | ⚠️ 手柄路径已通，手势待真机 | 模拟器无法驱动空间按钮 |
 
 **为什么有 ⚠️**：模拟器官方明示无法驱动 3D 空间按钮，空间交互与声场只能在真机验证。本项目坚持不伪造真机画面 —— 所有模拟器录屏都带角标标注。
@@ -117,6 +118,7 @@ adb shell am broadcast -a com.memorypalace.review.START               # 开始�
 adb shell am broadcast -a com.memorypalace.review.GRADE --es grade remember
 adb shell am broadcast -a com.memorypalace.clock.SET_OFFSET --el days 7  # 时间机器
 adb shell am broadcast -a com.memorypalace.audio.PLAY --es cue cue_due  # 空间提示音
+adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 ```
 
 ## 空间能力矩阵
@@ -149,7 +151,7 @@ adb shell am broadcast -a com.memorypalace.audio.PLAY --es cue cue_due  # 空间
 
 - **2026-11-07**：仓库初始化；M1 三窗空壳（双态生命周期实测封板）
 - **2026-11-07**：M2–M8 集中落地 —— 锚定闭环、数据层、复习流、导入管线、时间机器、预置牌组、导入确认页
-- **2026-11-09**：M12 冷启动占位页；M13 空间音频方位引导 + 记忆强度下沉 core（42 例单测全绿）
+- **2026-11-09**：M12 冷启动占位页；M13 空间音频方位引导 + 记忆强度下沉 core（42 例单测全绿）；M14 头显本地到期提醒
 - **11/10–11/13**：XR 同类竞品调研 ≥5 款；README / 算法 / 设计 / 评分文档定稿
 - **11/14–11/22**：真机借测窗口（空间交互唯一验证手段）；锚定最小闭环复测
 - **11/23–11/29**：复习流打磨；11/25 提交 v0.1 占位；11/28 起每日真实使用记录
