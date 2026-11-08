@@ -16,6 +16,7 @@
 | **到期通知发出** | ✅ | `DueNotifier: due notification posted: count=55 top="ephemeral"` |
 | **提醒调度 + 触发** | ✅ | `reminder overdue-immediate: fireAt=... (5s from now)` → `alarm fired, posting due notification` |
 | **提醒撤销** | ✅ | `due notification cancelled` / `reminder cancelled` |
+| **锚定闭环回归（放卡→杀进程→重进→找回）** | ✅ | `restored 2 anchor record(s)` → `verifyRestored: ... drift=0.0m` |
 | 精确闹钟 | ❌ 不可用 | `exact alarm not permitted, fell back to inexact alarm` —— PICO OS 未授予 SCHEDULE_EXACT_ALARM |
 
 ## 1. 本轮抓到并修掉的两个真实 bug
@@ -118,7 +119,34 @@ adb shell am broadcast -a com.memorypalace.audio.LIST
 adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排提醒
 adb shell am broadcast -a com.memorypalace.notify.TEST       # 立刻试响
 adb shell am broadcast -a com.memorypalace.notify.CANCEL     # 撤提醒
+
+# 锚定闭环回归（放卡 → 杀进程 → 重进 → 找回）
+adb shell am broadcast -a com.memorypalace.anchor.PLACE \
+    --ef x 0.0 --ef y 1.2 --ef z -1.5 --es front "persist-test" --es back "v.测试"
+adb shell am force-stop com.memorypalace
+adb shell am start -n com.memorypalace/.app.LaunchActivity
 ```
+
+## 4b. 锚定闭环回归实测（M12 修复后的完整复核）
+
+M12 改动了 manifest 与入口 Activity（启动路径），所以把**创新维度最硬的那条证据**重新跑了一遍，确认没被改坏：
+
+```
+04:04:03 I Anchor: createAnchor requested pos=(0.0,1.2,-1.5) card=e875ac3e
+04:04:03 I Anchor: createAnchor SUCCESS uuid=a572e6cb-... resolvedPos=(0.0,1.2,-1.5)
+04:04:05 I Anchor: verifyRestored: uuid=a572e6cb-... saved=(0.0,1.2,-1.5) resolved=(0.0,1.2,-1.5) drift=0.0m
+        ↓ adb shell am force-stop com.memorypalace
+04:05:26 I Anchor: restored 2 anchor record(s) from store
+04:05:41 I Anchor: verifyRestored: uuid=a572e6cb-... saved=(0.0,1.2,-1.5) resolved=(0.0,1.2,-1.5) drift=0.0m
+```
+
+**放卡 → 杀进程 → 重进 → 找回，drift 仍然 0.0m。** 这是 `docs/COMPETITORS.md` §5.2 差异点 1 的证据支撑 —— AR 词典类竞品靠实时相机识别，移开相机就失效；我们是系统级持久锚点，这一轮复核确认该结论在 M12 修订后依然成立。
+
+同一次启动里还顺带验证了：
+- 冷启动占位（M12 修订版）不黑屏，进程存活无异常
+- 三窗自动开启 attempt 1 成功
+- 房间层实体建立 `anchors=1`
+- 空间音频资源加载 `audio resource loaded: cue_due`
 
 ## 5. 本轮验证中新加的 CI 静态检查
 
