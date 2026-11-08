@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -90,6 +93,16 @@ fun StudyPanel() {
 fun TimeMachineView() {
     val tick by Clock.tick.collectAsState()
     val offset = remember(tick) { Clock.offsetDays() }
+    // M12：跳转瞬间先亮"在处理"态 —— 房间层 GL 纹理重建有数秒延迟（M6 实测），
+    // 没有这个提示的话，按完按钮房间层数秒没反应，现场观感="卡死了"。4.5s 后自动收起。
+    var jumping by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun jump(action: () -> Unit) {
+        jumping = true
+        action()
+        scope.launch { delay(4500); jumping = false }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(MpSpace.Sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
@@ -99,15 +112,22 @@ fun TimeMachineView() {
                 fontWeight = MpType.Bold,
                 color = if (offset == 0L) MpColors.TextSecondary else MpColors.TimeMachine,
             )
-            Button(onClick = { Clock.addDays(1) }) {
+            Button(onClick = { jump { Clock.addDays(1) } }) {
                 MpText("+1 天", fontSize = MpType.BodySmall)
             }
-            Button(onClick = { Clock.addDays(7) }) {
+            Button(onClick = { jump { Clock.addDays(7) } }) {
                 MpText("+7 天", fontSize = MpType.BodySmall)
             }
-            Button(onClick = { Clock.setOffsetDays(0) }) {
+            Button(onClick = { jump { Clock.setOffsetDays(0) } }) {
                 MpText("复位", fontSize = MpType.BodySmall)
             }
+        }
+        if (jumping) {
+            MpText(
+                "⏳ 时间跳转中：到期队列已重算，房间层锚卡正在重建褪色纹理（约数秒）…",
+                fontSize = MpType.BodySmall,
+                color = MpColors.TimeMachine,
+            )
         }
         MpText(
             "快进到未来：到期队列立即重算堆积，房间层锚定卡片按记忆强度褪色。无头：am broadcast -a com.memorypalace.clock.SET_OFFSET --el days 7",

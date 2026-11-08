@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.SpatialApp" parent="android:Theme.Translucent.NoTitleBar.Fullscreen" />
+
+    <!-- M12 冷启动占位：非透明主题才有 starting window，
+         windowBackground 在进程起来之前由系统直接绘制（秒级出现，不依赖任何应用代码）。 -->
+    <style name="Theme.MpSplash" parent="android:Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/mp_splash_bg</item>
+    </style>
 </resources>

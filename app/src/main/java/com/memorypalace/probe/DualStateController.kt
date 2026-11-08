@@ -54,6 +54,7 @@ object DualStateController {
                 try {
                     appContext?.let { openWindows(it) }
                     DualStateProbe.log("controller", "autoOpenOnce: windows opened at attempt ${attempt + 1}")
+                    com.memorypalace.app.SplashActivity.notifyReady()  // M12：关闭冷启动占位页
                     return@launch
                 } catch (e: IllegalStateException) {
                     DualStateProbe.log("controller", "autoOpenOnce attempt ${attempt + 1}: ${e.message}")

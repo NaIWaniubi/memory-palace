@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- M12 冷启动占位：深底 + 居中图标。系统 starting window 直接用这张图，
+     进程/dex/SDK 初始化期间屏幕不再空白。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="#FF12141A" />
+    </item>
+    <item
+        android:drawable="@mipmap/ic_launcher"
+        android:gravity="center"
+        android:width="96dp"
+        android:height="96dp" />
+</layer-list>

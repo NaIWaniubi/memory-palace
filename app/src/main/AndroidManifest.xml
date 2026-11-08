@@ -13,16 +13,24 @@
         android:theme="@style/Theme.SpatialApp"
         tools:targetApi="35">
 
+        <!-- M12：入口先落 SplashActivity（非透明主题有 starting window，冷启动不空屏），
+             由它立即转启 LaunchActivity；三窗打开后 SplashActivity 自动关闭。 -->
         <activity
-            android:name=".app.LaunchActivity"
+            android:name=".app.SplashActivity"
             android:exported="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|uiMode|keyboardHidden|navigation|keyboard"
-            android:theme="@style/Theme.SpatialApp">
+            android:theme="@style/Theme.MpSplash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
+        <activity
+            android:name=".app.LaunchActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|uiMode|keyboardHidden|navigation|keyboard"
+            android:theme="@style/Theme.SpatialApp">
             <!-- 房间层 Stage 配置（默认容器 = Stage，对齐官方 SpatialAudio Sample） -->
             <meta-data
                 android:name="pico.spatial.stage.id"
