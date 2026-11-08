@@ -146,7 +146,8 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 | [docs/ALGORITHM.md](docs/ALGORITHM.md) | SM-2 调度器与记忆强度可视化的完整规则与边界 |
 | [docs/DESIGN.md](docs/DESIGN.md) | 设计规范：色板 / 字号 / 间距 token 与褪色视觉规则 |
 | [docs/SCORING.md](docs/SCORING.md) | 评分维度的自评口径与每个数字的来源（含诚实声明） |
-| [docs/COMPETITORS.md](docs/COMPETITORS.md) | XR 同类竞品对比与差异化结论 |
+| [docs/COMPETITORS.md](docs/COMPETITORS.md) | XR 同类竞品对比与差异化结论（25 款取证） |
+| [docs/COMPETITOR-ANKI3D.md](docs/COMPETITOR-ANKI3D.md) | 「Anki 3D」线索证伪档案：产品不存在，含方法论教训 |
 | [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) | 三分钟现场演示操作单（给没碰过应用的操作员） |
 | [docs/DUAL-STATE-TEST.md](docs/DUAL-STATE-TEST.md) | 双态切换与窗口生命周期实测结论 |
 | [docs/ANCHOR-M2-TEST.md](docs/ANCHOR-M2-TEST.md) | 锚定闭环实测（含恢复漂移数据） |
