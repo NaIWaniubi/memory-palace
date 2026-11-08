@@ -2,6 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- M14：到期提醒。SCHEDULE_EXACT_ALARM 让闹钟卡在具体时刻；
+         Android 12+ 该权限可被用户撤销，代码里有不精确降级路径。 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".app.MemoryPalaceApplication"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -46,6 +51,15 @@
             android:name=".data.ImportPickerActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- M14：闹钟触发后发通知。静态注册：应用进程被杀时系统也要能拉起来。 -->
+        <receiver
+            android:name=".notify.DueReminder$FireReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.memorypalace.notify.FIRE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

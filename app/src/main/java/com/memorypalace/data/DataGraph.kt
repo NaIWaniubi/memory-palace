@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.room.Room
 import com.memorypalace.core.schedule.Grade
 import com.memorypalace.data.db.AppDatabase
+import com.memorypalace.notify.DueReminder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +51,11 @@ object DataGraph {
                         ACTION_ADD -> {
                             val front = intent.getStringExtra("front") ?: return
                             val back = intent.getStringExtra("back") ?: ""
-                            scope.launch { repository.add(front, back) }
+                            scope.launch {
+                                repository.add(front, back)
+                                // M14：加了卡就重排提醒（新卡立即到期，提醒时刻会前移）
+                                DueReminder.schedule(ctx.applicationContext)
+                            }
                         }
                         ACTION_REVIEW -> {
                             val idPrefix = intent.getStringExtra("id") ?: return

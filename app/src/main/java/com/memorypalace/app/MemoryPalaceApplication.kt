@@ -8,6 +8,8 @@ import com.memorypalace.data.DataGraph
 import com.memorypalace.data.ImportService
 import com.memorypalace.data.PresetDecks
 import com.memorypalace.mainApp
+import com.memorypalace.notify.DueNotifier
+import com.memorypalace.notify.DueReminder
 import com.memorypalace.probe.DualStateController
 import com.memorypalace.probe.DualStateProbe
 import com.memorypalace.review.ReviewSession
@@ -24,6 +26,8 @@ class MemoryPalaceApplication : Application() {
         Clock.register(this)
         ImportService.register(this)
         AudioProbe.register(this)               // M13：空间提示音无头驱动
+        DueNotifier.ensureChannel(this)         // M14：通知通道要先建
+        DueReminder.register(this)              // M14：到期提醒调度
         PresetDecks.installIfFirstLaunch(this)  // M7：首次启动导入三套预置牌组
         // 注：SDK 强制主线程初始化（SpatialApp.initialize 校验线程），
         // 后台线程启动会崩 —— 启动 ANR 只能等真机（arm64 原生无 houdini 转译开销）验证。

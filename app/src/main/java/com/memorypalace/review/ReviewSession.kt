@@ -10,6 +10,7 @@ import com.memorypalace.audio.SpatialCue
 import com.memorypalace.core.model.Card
 import com.memorypalace.core.schedule.Grade
 import com.memorypalace.data.DataGraph
+import com.memorypalace.notify.DueReminder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +51,12 @@ object ReviewSession {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /** 应用上下文：复习完成后要撤掉到期提醒（M14）。 */
+    @Volatile
+    private var appContext: Context? = null
+
     fun register(context: Context) {
+        appContext = context.applicationContext
         val filter = IntentFilter().apply {
             addAction(ACTION_START)
             addAction(ACTION_REVEAL)
@@ -127,6 +133,8 @@ object ReviewSession {
                 SpatialCue.entityOf(card.id)?.let { entity ->
                     scope.launch { SpatialCue.play(entity, SpatialCue.CUE_DONE) }
                 }
+                // M14：复习完了就撤掉"该复习了"的提醒，别让它继续挂着
+                appContext?.let { DueReminder.cancel(it) }
                 null
             } else {
                 s.copy(index = next, revealed = false)

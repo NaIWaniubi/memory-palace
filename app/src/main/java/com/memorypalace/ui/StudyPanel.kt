@@ -28,6 +28,7 @@ import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.data.ImportPickerActivity
 import com.memorypalace.data.ImportService
+import com.memorypalace.notify.DueReminder
 import com.memorypalace.probe.DualStateController
 import com.memorypalace.probe.DualStateProbe
 import com.memorypalace.review.ReviewSession
@@ -39,6 +40,7 @@ fun StudyPanel() {
     val instanceId = remember { DualStateProbe.claim("study_panel") }
     LifecycleLogger("study_panel", instanceId)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(MpSpace.PanelMain),
@@ -68,6 +70,26 @@ fun StudyPanel() {
 
         MpText(
             "导入（M5/M8）：支持 CSV / 纯文本 / Anki .apkg，离线解析。真机走「导入牌组」选文件 → 此处出字段映射确认页；无头直导：card.IMPORT --es path …",
+            fontSize = MpType.Caption,
+            color = MpColors.TextSecondary,
+        )
+
+        // M14：到期提醒。头显本地通知，不依赖手机 App、不依赖网络。
+        Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
+            Button(onClick = { scope.launch { DueReminder.schedule(context) } }) {
+                MpText("排提醒", fontSize = MpType.BodySmall)
+            }
+            Button(onClick = { scope.launch { DueReminder.postDue(context) } }) {
+                MpText("立刻试响", fontSize = MpType.BodySmall)
+            }
+            Button(onClick = { DueReminder.cancel(context) }) {
+                MpText("撤提醒", fontSize = MpType.BodySmall)
+            }
+        }
+        MpText(
+            "到期提醒（M14）：头显本地通知，遗忘曲线算出到期时刻后在头显里弹横幅。" +
+                "提醒时刻 = 当天最后一张到期卡的到期时间（一次响一整批，不逐张打扰）。" +
+                "无头：am broadcast -a com.memorypalace.notify.SCHEDULE / TEST / CANCEL",
             fontSize = MpType.Caption,
             color = MpColors.TextSecondary,
         )
