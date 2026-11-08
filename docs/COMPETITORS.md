@@ -100,6 +100,9 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 | 39 | https://play.google.com/store/apps/details?id=com.quizlet.quizletandroid | 200 | Quizlet |
 | 40 | https://play.google.com/store/apps/details?id=com.duolingo | 200 | Duolingo |
 | 41 | https://en.wikipedia.org/wiki/Method_of_loci | 200 | 记忆术方法学背景 |
+| 42 | https://developers.meta.com/vr/design/spatial_audio/ | 400（Meta 反爬） | Meta 官方空间音频开发文档（经 WebFetch 渲染取证） |
+| 43 | https://www.meta.com/horizon/learn/ | 400（Meta 反爬） | Meta for Education 官方页 |
+| 44 | https://www.meta.com/horizon/ | 400（Meta 反爬） | Horizon Worlds 官方站 |
 
 **B. 访问但未收录（判定为不可考 / 非竞品 / 已失效）**
 
@@ -168,7 +171,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 
 - 收录竞品总数：**25 款**
 - 「空间锚定实物家具」= **是**：**3 款**（① Loci Devpost 原型、⑲ Halo AR、⑳ IKEA Place — 其中 IKEA Place 的锚定用于购物试摆而非学习）；= **部分**：**4 款**（③ SpatialFlashcards、⑬ Noun Town、⑱ ARLOOPA、㉑ ThingLink XR）
-- 「遗忘曲线调度」= **是**：**9 款**（④ Loci 手机版、⑤ Mind Palace、⑥ Mindhall、⑦ MnemoPal、⑧ Art of Memory、⑨ Anki、⑩ SuperMemo、⑬ Noun Town、㉔ Quizlet）；= **部分**：**3 款**（⑪ Mondly VR、㉕ Memrise、㉖ Duolingo）
+- 「遗忘曲线调度」= **是**：**9 款**（④ Loci 手机版、⑤ Mind Palace、⑥ Mindhall、⑦ MnemoPal、⑧ Art of Memory、⑨ Anki、⑩ SuperMemo、⑬ Noun Town、㉓ Quizlet）；= **部分**：**3 款**（⑪ Mondly VR、㉔ Memrise、㉕ Duolingo）
 - **同时满足「空间锚定 = 是」且「遗忘曲线调度 = 是」：0 款**（**这是本调研最重要的统计结论**）
 - **空间锚定 = 是 或 部分，且在 XR / MR 头显上运行：3 款**（① Loci Devpost 原型、③ SpatialFlashcards、⑬ Noun Town），**三者全部没有遗忘曲线调度**
 
@@ -253,7 +256,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 - **取证**：https://5thscape.com/gameverse/vr4ll-virtual-reality-for-language-learning/
 - **对我方意义**：Meta 官方出品的 XR 语言教育代表作，走的是「虚拟场景 + 协作任务」路线，**完全不做个人间隔重复**，佐证 XR 端 SRS 是空白。
 
-#### ⑨ VRChat（教育类世界生态）
+#### ㉒ VRChat（教育类世界生态）
 
 - **平台**：PC / SteamVR / Meta Quest / **PICO 独立版** / iOS / Android
 - **核心机制**：社区 UGC 世界平台。官方 Wiki 设有「Educational worlds」分类，明确定义包含「worlds with flashcards」（带闪卡的世界）、博物馆、动觉教学等
@@ -467,7 +470,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 
 #### 差异点 2：**遗忘曲线算出的复习时刻**与**空间引导**被做成同一条闭环
 
-- **依据**：25 款竞品中，遗忘曲线调度 = 「是」的 9 款（④⑤⑥⑦⑧⑨⑩⑬㉔）**全部是 2D 屏幕产品**，其排程结果只能表现为「App 里弹出一条待复习卡片」——**学习者与卡片之间的物理关系为零**。
+- **依据**：25 款竞品中，遗忘曲线调度 = 「是」的 9 款（④⑤⑥⑦⑧⑨⑩⑬㉓）中，**8 款是纯 2D 屏幕产品**（④ Loci 手机版、⑤ Mind Palace、⑥ Mindhall、⑦ MnemoPal、⑧ Art of Memory、⑨ Anki、⑩ SuperMemo、㉓ Quizlet），其排程结果只能表现为「App 里弹出一条待复习卡片」——**学习者与卡片之间的物理关系为零**。唯一例外是 ⑬ Noun Town（Quest MR 版），但它锚定的是「虚拟小镇」而非真实家具。
   - ⑤ Mind Palace 用了 **refined SM-2**，⑥ Mindhall 用 FSRS，⑩ SuperMemo 就是 SM-2 的来源地——**算法层已高度成熟且无差异化空间**
   - 反观 XR 侧：②⑪⑫⑬⑭ 的排程，要么没有（②⑭ VR4LL）、要么只是营销话术（⑪ Mondly 的方法论页），要么属于产品线而非 XR 形态（⑪）
 - **我方具体做法**：SM-2 改进版算出的**「该复习了」的时刻**，被翻译成**空间指令**——空间音频在正确时间把你引导到正确位置（冰箱前 → 抽屉前 → 书桌前）。**这不是「App 提醒你复习」，而是「你的房间来提醒你复习」。**
