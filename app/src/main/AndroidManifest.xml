@@ -18,24 +18,24 @@
         android:theme="@style/Theme.SpatialApp"
         tools:targetApi="35">
 
-        <!-- M12：入口先落 SplashActivity（非透明主题有 starting window，冷启动不空屏），
-             由它立即转启 LaunchActivity；三窗打开后 SplashActivity 自动关闭。 -->
-        <activity
-            android:name=".app.SplashActivity"
-            android:exported="true"
-            android:theme="@style/Theme.MpSplash">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
+        <!-- M12 修订：LAUNCHER 必须直接是 Spatial stub activity。
+             SDK 在 LAUNCHER 启动时创建入口容器 —— 用普通 Activity 当 LAUNCHER 会先
+             建出默认 WindowContainer，之后 LaunchActivity 注册 Stage 时冲突崩溃；
+             而 stage meta-data 挂在普通 LAUNCHER 上则 Stage 根本不注册。
+             官方三个 Sample 同样是"LAUNCHER = SpatialLaunchActivity"。
+             冷启动黑屏改由 LaunchActivity 启动后换主题解决（见 LaunchActivity.kt），
+             manifest 主题保持非透明，系统才能画 starting window。 -->
         <activity
             android:name=".app.LaunchActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|uiMode|keyboardHidden|navigation|keyboard"
-            android:theme="@style/Theme.SpatialApp">
+            android:theme="@style/Theme.MpSplash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
             <!-- 房间层 Stage 配置（默认容器 = Stage，对齐官方 SpatialAudio Sample） -->
             <meta-data
                 android:name="pico.spatial.stage.id"

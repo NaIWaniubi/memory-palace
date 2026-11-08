@@ -44,6 +44,39 @@ jobs:
           grep -q 'android.intent.category.LAUNCHER' app/src/main/AndroidManifest.xml \
             || { echo "::error::no LAUNCHER activity"; exit 1; }
           echo "launcher entry: OK"
+      - name: stage meta-data must live on the LAUNCHER activity
+        run: |
+          # SDK 在 LAUNCHER activity 启动时读 pico.spatial.stage.* 并注册 Stage。
+          # meta-data 挂在别的 activity 上 → "Stage(...) not registered" 未捕获异常
+          # → 进程被杀。这个坑踩过一次（M12 把入口换成 SplashActivity 时）。
+          python3 - <<'PY'
+          import re, sys, xml.etree.ElementTree as ET
+          ns = '{http://schemas.android.com/apk/res/android}'
+          tree = ET.parse('app/src/main/AndroidManifest.xml')
+          root = tree.getroot()
+          app = root.find('application')
+          launcher = None
+          for act in app.findall('activity'):
+              for f in act.findall('intent-filter'):
+                  for cat in f.findall('category'):
+                      if cat.get(ns + 'name') == 'android.intent.category.LAUNCHER':
+                          launcher = act
+          if launcher is None:
+              print('::error::no LAUNCHER activity found'); sys.exit(1)
+          names = {m.get(ns + 'name') for m in launcher.findall('meta-data')}
+          need = {'pico.spatial.stage.id', 'pico.spatial.stage.style'}
+          missing = need - names
+          if missing:
+              print('::error::LAUNCHER activity missing meta-data:', missing); sys.exit(1)
+          # 同时确认没有把 stage meta-data 挂到别的 activity 上（双份会互相覆盖）
+          for act in app.findall('activity'):
+              if act is launcher: continue
+              for m in act.findall('meta-data'):
+                  if (m.get(ns + 'name') or '').startswith('pico.spatial.stage.'):
+                      print('::error::stage meta-data on non-LAUNCHER activity:',
+                            act.get(ns + 'name'), m.get(ns + 'name')); sys.exit(1)
+          print('stage meta-data on LAUNCHER activity: OK')
+          PY
       - name: every adb broadcast action is unique
         run: |
           # 无头驱动广播全靠 action 唯一性，重名会让两个接收器抢同一条消息。

@@ -38,8 +38,8 @@ pico-cli app launch                               # 3. 启动应用
 | 复习流（队列 → 翻面 → 自评 → 调度更新） | ✅ 已实测 | [复习流结论](docs/M4-REVIEW-FLOW-TEST.md) |
 | CSV / TXT / Anki apkg 牌组导入 + 字段映射确认页 | ✅ 已实测 | [导入管线](docs/M5-IMPORT-PIPELINE-TEST.md) · [确认页](docs/M8-IMPORT-CONFIRM-TEST.md) |
 | 三套预置示例牌组（语言 / 专业术语 / 生活常识） | ✅ 已实测 | [预置牌组](docs/M7-PRESET-DECKS-TEST.md) |
-| 空间音频方位引导 | ⚠️ 已实现（M13），待真机验证声场 | 代码见 `app/.../audio/SpatialCue.kt` |
-| 头显本地到期提醒 | ⚠️ 已实现（M14），待真机验证弹窗 | 代码见 `app/.../notify/DueNotifier.kt` |
+| 空间音频方位引导 | ✅ 模拟器已实测（声场方位待真机） | [实测结论](docs/M12-M14-TEST.md) |
+| 头显本地到期提醒 | ✅ 模拟器已实测（弹窗与精确闹钟待真机） | [实测结论](docs/M12-M14-TEST.md) |
 | 手势 + 手柄双路径交互 | ⚠️ 手柄路径已通，手势待真机 | 模拟器无法驱动空间按钮 |
 
 **为什么有 ⚠️**：模拟器官方明示无法驱动 3D 空间按钮，空间交互与声场只能在真机验证。本项目坚持不伪造真机画面 —— 所有模拟器录屏都带角标标注。

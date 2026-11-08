@@ -41,6 +41,12 @@ object DueReminder {
 
     private const val REQUEST_CODE = 2001
 
+    /**
+     * 全员逾期时的提醒延迟。给一点延迟而不是 0 —— 让用户先把头戴上，
+     * 别在还没进入应用时弹一条通知。
+     */
+    private const val IMMEDIATE_DELAY_MILLIS = 5_000L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
@@ -94,14 +100,33 @@ object DueReminder {
             Log.i(TAG, "no due card, reminder cancelled")
             return
         }
-        // 取最晚到期的那张卡作为提醒时刻
-        val last = due.maxByOrNull { it.dueAt } ?: return
-        val fireAt = last.dueAt
+
+        val now = Clock.now()
+        // 提醒时刻的语义（这里踩过坑）：
+        // 到期队列里的卡 dueAt 可能全在**过去** —— 用户已经拖了几天没复习。
+        // 这时"最后一张卡"的到期时刻是过去时间，setExact 会立刻触发，
+        // 变成"刚排上就响"的空提醒，而且每次重排都重复发生。
+        //
+        // 正确语义分两种情况：
+        //  1. 还有**未来**到期的卡 → 提醒设在那个时刻（"到点了，该复习了"）
+        //  2. 全部已经逾期 → 已经没有"未来的时刻"可等，立刻提醒一次
+        //     （"你有 N 张卡正在褪色，现在就来看"）
+        val future = due.filter { it.dueAt > now }
+        val fireAt: Long
+        val mode: String
+        if (future.isNotEmpty()) {
+            fireAt = future.maxOf { it.dueAt }
+            mode = "scheduled"
+        } else {
+            fireAt = now + IMMEDIATE_DELAY_MILLIS
+            mode = "overdue-immediate"
+        }
+
         setAlarm(context, fireAt)
         Log.i(
             TAG,
-            "reminder scheduled: fireAt=$fireAt (${(fireAt - Clock.now()) / 1000}s from now) " +
-                "dueCount=${due.size} top=${due.first().front}"
+            "reminder $mode: fireAt=$fireAt (${(fireAt - now) / 1000}s from now) " +
+                "dueCount=${due.size} futureCount=${future.size} top=${due.first().front}"
         )
     }
 
@@ -123,6 +148,14 @@ object DueReminder {
             am.canScheduleExactAlarms()
         } else {
             true
+        }
+        if (!canExact) {
+            // 精确闹钟不可用：用户在系统设置里关掉了，或 PICO OS 未授予。
+            // 不精确闹钟会被系统批量延后（可能延几十分钟）——对"该复习了"
+            // 这种提醒来说延迟可接受，但必须让用户知道去开权限。
+            // 面板上给出指引（见书房面板的权限提示），并在日志写明。
+            Log.w(TAG, "exact alarm unavailable — 提醒可能被系统延后。" +
+                "引导用户到系统设置开启「闹钟和提醒」权限（SCHEDULE_EXACT_ALARM）")
         }
 
         runCatching {
@@ -162,5 +195,15 @@ object DueReminder {
         am.cancel(pi)
         DueNotifier.cancel(context)
         Log.i(TAG, "reminder cancelled")
+    }
+
+    /**
+     * 精确闹钟是否可用。UI 用它提示用户去开权限 ——
+     * 没有精确闹钟，系统会把提醒延后到不确定的时刻，用户以为功能坏了。
+     */
+    fun canScheduleExact(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val am = context.getSystemService(AlarmManager::class.java) ?: return false
+        return am.canScheduleExactAlarms()
     }
 }

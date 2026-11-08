@@ -88,11 +88,20 @@ fun StudyPanel() {
         }
         MpText(
             "到期提醒（M14）：头显本地通知，遗忘曲线算出到期时刻后在头显里弹横幅。" +
-                "提醒时刻 = 当天最后一张到期卡的到期时间（一次响一整批，不逐张打扰）。" +
+                "一次响一整批，不逐张打扰；全部逾期时立刻提醒一次。" +
                 "无头：am broadcast -a com.memorypalace.notify.SCHEDULE / TEST / CANCEL",
             fontSize = MpType.Caption,
             color = MpColors.TextSecondary,
         )
+        // 精确闹钟权限：没有它系统会把提醒延后几十分钟，必须让用户看见并去开
+        if (!DueReminder.canScheduleExact(context)) {
+            MpText(
+                "⚠ 精确闹钟权限未开启，提醒会被系统延后。" +
+                    "请到系统设置 → 应用 → 记忆宫殿 → 闹钟和提醒 → 允许",
+                fontSize = MpType.Caption,
+                color = MpColors.Warning,
+            )
+        }
 
         ImportConfirmView()
 
