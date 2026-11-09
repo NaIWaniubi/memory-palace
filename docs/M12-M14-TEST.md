@@ -234,6 +234,24 @@ pico-cli emulator start --avd Pico_Emulator_6_1 --watch
 
 **一个正面发现**：应用层数据（卡片、锚定记录）**完全没丢**（`restored 2 anchor record(s)`）—— 丢的只有系统级锚点绑定。这正是"降级路径按设计工作"的最好证明：卡片仍在、位置仍在、只是不再绑定系统锚点。
 
+### 恢复后的 M13/M14 全链路复测（同一次恢复后立刻做）
+
+模拟器实例重建相当于一次「全新设备」，所以借这个时机把 M13/M14 在**干净状态**下再验一遍 —— 证明之前的结论不是偶然：
+
+```
+I SpatialCue: play(cue_due) on entity at 73234514
+I DueNotifier: due notification posted: count=57 top="ephemeral"
+W DueReminder: exact alarm unavailable — 提醒可能被系统延后。引导用户到系统设置开启「闹钟和提醒」权限
+W DueReminder: exact alarm not permitted, fell back to inexact alarm
+I DueReminder: reminder overdue-immediate: fireAt=... (5s from now) dueCount=57 futureCount=0
+I DueReminder: alarm fired, posting due notification
+I DueNotifier: due notification posted: count=57 top="ephemeral"
+I DueNotifier: due notification cancelled
+I DueReminder: reminder cancelled
+```
+
+**空间音频播放 / 通知发出 / 提醒调度触发撤销，四项全通过**，且行为与首次实测完全一致（含精确闹钟不可用时的降级路径）。**M13/M14 的实现不依赖模拟器实例的状态** —— 换设备重跑依然成立。
+
 **这正是决赛现场的操作顺序** —— 模拟器挂了重启之后，评委不会给你时间重放三分钟视频。演练时必须把这个恢复流程跑一遍。
 
 ## 7. 待真机验证清单（本轮新增/变更）
