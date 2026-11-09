@@ -1,5 +1,7 @@
 # M1 双态行为实测结论（Shared Space ↔ Full Space 窗口生命周期）
 
+> 📌 **本文是 `docs/DUAL-STATE-VERIFICATION.md` 的原始实测记录** —— 后者是双态行为的正式结论文档（文件名由作战方案 §6.1 指定），从本文及 `docs/M12-M14-TEST.md`、`docs/ANCHOR-M2-TEST.md` 提炼而成，对外引用请用后者。
+
 > 实测日期：2026-11-07 · 环境：PICO Emulator 6.1.0（AVD Pico_Emulator_6_1, swan_x86_64）· Spatial SDK 6.1.9 · APK：app-debug（M1 三窗空壳）
 > 对应校验清单 #4（双态切换窗口是否重建 = L2 降级触发点）——**本条现在有实测答案了。**
 

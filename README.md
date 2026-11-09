@@ -151,7 +151,8 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 | [docs/COMPETITORS.md](docs/COMPETITORS.md) | XR 同类竞品对比与差异化结论（25 款取证） |
 | [docs/COMPETITOR-ANKI3D.md](docs/COMPETITOR-ANKI3D.md) | 「Anki 3D」线索证伪档案：产品不存在，含方法论教训 |
 | [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) | 三分钟现场演示操作单（给没碰过应用的操作员） |
-| [docs/DUAL-STATE-TEST.md](docs/DUAL-STATE-TEST.md) | 双态切换与窗口生命周期实测结论 |
+| [docs/DUAL-STATE-VERIFICATION.md](docs/DUAL-STATE-VERIFICATION.md) | 双态行为实测结论（正式文档）：逐条实测表、生命周期日志原文、已知边界与真机待验清单 |
+| [docs/DUAL-STATE-TEST.md](docs/DUAL-STATE-TEST.md) | 双态切换与窗口生命周期实测结论（原始记录） |
 | [docs/ANCHOR-M2-TEST.md](docs/ANCHOR-M2-TEST.md) | 锚定闭环实测（含恢复漂移数据） |
 | [docs/M4–M8-*-TEST.md](docs/) | 复习流 / 导入管线 / 时间机器 / 预置牌组 / 确认页 实测记录 |
 | [docs/VIDEO-STORYBOARD.md](docs/VIDEO-STORYBOARD.md) | 演示视频分镜（150s 五幕） |
