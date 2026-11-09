@@ -53,13 +53,18 @@ fun RoomStage() {
                 records.forEach { rec ->
                     val panel = attachments.entity(rec.key) ?: return@forEach
                     val parent: Entity = if (rec.uuid != null) {
-                        AnchorEntity(AnchorTarget.createWorldAnchorTarget(UUID.fromString(rec.uuid)))
-                    } else {
-                        Entity().apply {
-                            components[TransformComponent::class.java]?.apply {
-                                position = Vector3(rec.px, rec.py, rec.pz)
-                            }
+                        // UUID 来自持久层，可能是坏数据 —— 解析失败时不能让整个
+                        // composition 抛异常（那会崩在进入房间层的第一步），
+                        // 按回退位姿处理
+                        val parsed = runCatching { UUID.fromString(rec.uuid) }.getOrNull()
+                        if (parsed != null) {
+                            AnchorEntity(AnchorTarget.createWorldAnchorTarget(parsed))
+                        } else {
+                            Log.e(AnchorScene.TAG, "bad uuid in record, fallback: ${rec.uuid}")
+                            fallbackEntity(rec)
                         }
+                    } else {
+                        fallbackEntity(rec)
                     }
                     parent.addChild(panel)
                     content.addEntity(parent)
@@ -98,3 +103,20 @@ fun RoomStage() {
         )
     }
 }
+
+/**
+ * 回退实体（锚点服务不可用 / UUID 坏数据时用）。
+ *
+ * 关键：必须显式挂一个 TransformComponent 再设 position。
+ * 之前写的是 `Entity().apply { components[TransformComponent::class.java]?.apply { ... } }`——
+ * Entity() 只创建空的 ComponentSet，`components[Class]` 是纯查表、缺省返回 null，
+ * 所以 `?.apply` 是空操作，parent 没有 Transform，卡片全部落在原点。
+ * 那是"按保存位姿直渲"这条叙事唯一的渲染路径，等于整条路是假的。
+ */
+private fun fallbackEntity(rec: com.memorypalace.anchor.AnchorRecord): Entity =
+    Entity().apply {
+        val t = TransformComponent()
+        t.position = Vector3(rec.px, rec.py, rec.pz)
+        t.eulerAngles = com.pico.spatial.core.math.EulerAngles(rec.pitch, rec.yaw, rec.roll)
+        components.set(TransformComponent::class.java, t)
+    }

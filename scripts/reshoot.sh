@@ -161,5 +161,19 @@ wait_log "confirm import done" 60 || true
 sleep 5
 grab v12_after_confirm
 
+# M13 / M14 是竞品调研指出的「零覆盖」项，视频里必须各给一幕 ——
+# 否则最差异化能力在成品视频里完全不可见。
+echo "· 空间音频方位引导（M13）"
+sh_ am broadcast -a com.memorypalace.audio.PLAY --es cue cue_due >/dev/null
+wait_log "play\(cue_due\)" 40 || true
+sleep 4
+grab v13_spatial_audio
+
+echo "· 到期提醒（M14）"
+sh_ am broadcast -a com.memorypalace.notify.TEST >/dev/null
+wait_log "due notification posted" 60 || true
+sleep 5
+grab v14_notification
+
 echo
 echo "重拍完成：$(ls "$OUT"/*.jpg 2>/dev/null | wc -l) 张"

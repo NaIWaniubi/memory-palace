@@ -32,7 +32,7 @@ fun ReviewCard() {
     val demo by DemoMode.enabled.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(MpSpace.PanelCard),
+        modifier = Modifier.fillMaxSize().mpPanel(),
         verticalArrangement = Arrangement.spacedBy(MpSpace.Lg),
     ) {
         MpText("随身复习卡", fontSize = MpType.Title, fontWeight = MpType.Bold)

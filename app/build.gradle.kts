@@ -33,7 +33,11 @@ android {
 
     kotlinOptions { jvmTarget = "11" }
 
-    buildFeatures { compose = true }
+    // buildConfig 打开：DebugFlags 用它区分 debug/release 的广播接收器导出策略
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {

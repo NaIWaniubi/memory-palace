@@ -81,9 +81,9 @@ adb shell am broadcast -a com.memorypalace.dualstate.TOGGLE_REVIEW_CARD  # 开�
 | 14 | 锚点创建 | 24 秒后再次放置 | 锚点创建成功 | `createAnchor SUCCESS uuid=e71357b4-… resolvedPos=(0.5,1.3,-1.2)`，drift=0.0m | ✅ 正常 |
 | 15 | 锚点位置正确性 | 截图 `m2-01-anchored-full.jpg` | 卡片钉在预期位置 | 「ephemeral」在右侧架子上方（0.5,1.3,-1.2），「abandon」在床面（0,1.2,-1.5） | ✅ 位置与保存位姿一致 |
 | 16 | 杀进程重启恢复 | `am force-stop` → 冷启动（新 PID） | 记录恢复并按 UUID 重解析 | `restored 2 anchor record(s) from store` → 两条记录全部恢复渲染 | ✅ 锚定最小闭环通 |
-| 17 | 恢复漂移 | 恢复后校验 | 漂移应接近 0 | `verifyRestored: uuid=e71357b4-… saved=(0.5,1.3,-1.2) resolved=(0.5,1.3,-1.2) drift=0.0m` | ✅ drift=0.0m |
-| 18 | 恢复后画面一致 | 截图 `m2-04-after-process-restart.jpg` | 与放置后一致 | 与 `m2-01` **逐字节一致**：两张卡原位重现 | ✅ 视觉可复原 |
-| 19 | M12 修订后回归 | 放卡 → 杀进程 → 重进 → 找回 | 改 manifest/入口后未改坏 | `04:04:03 createAnchor SUCCESS uuid=a572e6cb-…` → `04:05:26 restored 2 anchor record(s) from store` → `04:05:41 verifyRestored: … drift=0.0m` | ✅ 创新维度最硬的证据未被 M12 改动破坏 |
+| 17 | UUID 重新解析 | 恢复后校验 | save/resolved 应一致 | `verifyRestored: uuid=e71357b4-… saved=(0.5,1.3,-1.2) resolved=(0.5,1.3,-1.2)` | ✅ UUID 可重解析（**注意：模拟器回显请求位姿，相等是恒等式，不代表空间精度**） |
+| 18 | ~~恢复后画面一致~~ | ~~截图对比~~ | — | **证据作废**：原引用的两张截图是同一份文件（MD5 相同），且模拟器回显位姿使「画面一致」成为必然结果 | ❌ 不能作为证据（复核后移除） |
+| 19 | M12 修订后回归 | 放卡 → 杀进程 → 重进 → 找回 | 改 manifest/入口后未改坏 | `04:04:03 createAnchor SUCCESS uuid=a572e6cb-…` → `04:05:26 restored 2 anchor record(s) from store` → `04:05:41 verifyRestored: uuid=a572e6cb-… saved=(0.0,1.2,-1.5) resolved=(0.0,1.2,-1.5)` | ✅ 状态机未被 M12 改动破坏（`drift` 字段是恒等式，不作为精度证据） |
 
 ### 2.3 空间音频、到期通知与提醒调度（M13 / M14）
 
@@ -222,7 +222,7 @@ PICO 官方明示：模拟器**无法驱动 3D 空间按钮**。因此以下能�
 
 | 表述 | 准确性 |
 |---|---|
-| 「锚点持久化，杀进程重进可找回，drift 0.0m」 | ✅ 准确 —— 指**同一模拟器实例内**的应用进程被杀重启 |
+| 「锚点记录持久化，杀进程重进后 UUID 能重新解析」 | ✅ 准确 —— **仅限同一模拟器实例内**。不要写成「漂移 0.0m」：那是恒等式 |
 | 「锚点在设备重启后仍在」 | ❌ **未验证** —— 模拟器实例重建会丢；真机行为待验 |
 | 「锚点在搬家 / 陌生场地后仍在」 | ❌ **明确不会** —— 系统锚点绑定当前空间，换场地必丢（这正是 L4 降级存在的原因） |
 

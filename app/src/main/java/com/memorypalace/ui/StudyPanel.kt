@@ -45,7 +45,7 @@ fun StudyPanel() {
     val demo by DemoMode.enabled.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(MpSpace.PanelMain),
+        modifier = Modifier.fillMaxSize().mpPanel(),
         verticalArrangement = Arrangement.spacedBy(MpSpace.Xl),
     ) {
         MpText("记忆宫殿 · 书房面板", fontSize = MpType.Display, fontWeight = MpType.Bold)
@@ -214,9 +214,16 @@ fun DueQueueView() {
                     "· ${c.front} — ${c.back}（reps=${c.repetitions} ef=${"%.2f".format(c.easiness)} 间隔=$intervalText id=${c.id.take(8)}）",
                     fontSize = MpType.BodySmall,
                 )
-                // 放置动作的真实入口：把到期卡钉到面前 1.5m（无头等价：anchor.PLACE）
+                // 放置动作的真实入口：把到期卡钉进房间。
+                // 位姿按已有锚点数轮转，避免所有卡叠在同一个点（曾经的画面问题：
+                // 4 张卡的文字挤成一团，看上去像一坨）。
+                // 注意：这不是"贴合真实家具表面"——那是真机才有的平面检测 + 手柄取点，
+                // 目前未实现。这里只是几个预设位置。
                 if (i == 0) {
-                    Button(onClick = { AnchorScene.placeForCard(c.id, 0.0f, 1.2f, -1.5f) }) {
+                    Button(onClick = {
+                        val slot = PLACE_SLOTS[AnchorScene.records.value.size % PLACE_SLOTS.size]
+                        AnchorScene.placeForCard(c.id, slot.first, slot.second, slot.third)
+                    }) {
                         MpText("钉入房间", fontSize = MpType.Caption)
                     }
                 }
@@ -262,6 +269,18 @@ fun DueQueueView() {
         }
     }
 }
+
+/**
+ * 放置预设位（米，相对房间原点；眼高约 1.6m）。
+ * 四个高度/左右不同的位置，让多张卡在画面里分得开。
+ * 真机上这些位置应当由手柄射线 + 平面检测决定，目前未实现。
+ */
+private val PLACE_SLOTS = listOf(
+    Triple(0.0f, 1.15f, -1.50f),   // 正前偏下（床/沙发高度）
+    Triple(0.95f, 1.30f, -1.35f),  // 右侧（书架方向）
+    Triple(-0.95f, 1.55f, -1.35f), // 左侧偏上（墙面）
+    Triple(0.15f, 1.75f, -1.80f),  // 高处
+)
 
 /** 字段映射确认页（M8）：SAF/预览广播解析出 pendingPreview 后在此确认入库。 */
 @Composable

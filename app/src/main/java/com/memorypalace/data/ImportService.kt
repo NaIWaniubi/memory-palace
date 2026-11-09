@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -77,7 +78,7 @@ object ImportService {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "import receiver registered")
     }
@@ -110,21 +111,47 @@ object ImportService {
         }
     }
 
-    /** 真机文件选择器路径：解析为预览并发布到 pendingPreview，由书房面板确认页接管。 */
-    suspend fun previewFromUri(context: Context, uri: Uri) {
-        val name = queryDisplayName(context, uri) ?: "import.csv"
-        val tmp = File(context.cacheDir, "import_${System.currentTimeMillis()}_$name")
+    /**
+     * 真机文件选择器路径：解析为预览并发布到 pendingPreview，由书房面板确认页接管。
+     *
+     * 两处必须注意（2026-11-09 审查发现）：
+     * ① 全流程 try/catch —— provider 打不开文件（SecurityException/FileNotFound）、
+     *    文件名含 `/` 或超长（ENAMETOOLONG）、cache 满（IOException）都会抛出去。
+     *    调用方是 Activity 的 Main scope，没有异常处理器 → 直接崩进程。
+     * ② 全流程在 Dispatchers.IO —— 查询文件名是 IPC、拷贝整文件、readText、
+     *    开 SQLite 都是阻塞调用，放在主线程上导入几 MB 的 CSV 就卡 UI。
+     */
+    suspend fun previewFromUri(context: Context, uri: Uri) = withContext(Dispatchers.IO) {
+        var tmp: File? = null
         try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                tmp.outputStream().use { input.copyTo(it) }
-            } ?: run { Log.w(TAG, "preview: cannot open $uri"); return }
-            val preview = previewFromPath(context, tmp.absolutePath)
-            if (preview != null) {
-                pendingPreview.value = preview.copy(fileName = name)
-                Log.i(TAG, "preview ready: ${name} format=${preview.format} parsed=${preview.cards.size}")
+            val rawName = queryDisplayName(context, uri) ?: "import.csv"
+            // 文件名只用来展示，落盘用 UUID —— 避免 `/`、超长名、控制字符
+            val safeExt = rawName.substringAfterLast('.', "").lowercase()
+                .filter { it.isLetterOrDigit() }.take(8).ifEmpty { "dat" }
+            val displayName = rawName.replace('/', '_').take(120).ifEmpty { "import.$safeExt" }
+            tmp = File(context.cacheDir, "import_${System.currentTimeMillis()}.$safeExt")
+
+            val copied = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { input.copyTo(it) }
+                } ?: 0L
+            }.onFailure { Log.e(TAG, "preview: copy failed for $uri", it) }.getOrDefault(0L)
+            if (copied == 0L) {
+                Log.w(TAG, "preview: cannot open or empty: $uri")
+                return@withContext
             }
+
+            val preview = runCatching { previewFromPath(context, tmp.absolutePath) }
+                .onFailure { Log.e(TAG, "preview: parse failed for $displayName", it) }
+                .getOrNull() ?: return@withContext
+
+            pendingPreview.value = preview.copy(fileName = displayName)
+            Log.i(TAG, "preview ready: $displayName format=${preview.format} parsed=${preview.cards.size}")
+        } catch (t: Throwable) {
+            // 兜底：任何没料到的异常都不允许冒到 Main scope 崩掉进程
+            Log.e(TAG, "previewFromUri failed: ${t.message}", t)
         } finally {
-            tmp.delete()
+            runCatching { tmp?.delete() }
         }
     }
 

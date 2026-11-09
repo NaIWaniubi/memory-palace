@@ -49,7 +49,7 @@ object AudioProbe {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "audio broadcast receiver registered")
     }

@@ -70,7 +70,7 @@ object DataGraph {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "card command receiver registered")
     }

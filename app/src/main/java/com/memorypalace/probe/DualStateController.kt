@@ -87,7 +87,7 @@ object DualStateController {
             },
             filter,
             // 调试用测试入口：需要 adb shell 广播能送达，故 EXPORTED（release 版移除）
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         DualStateProbe.log("controller", "broadcast receiver registered")
     }

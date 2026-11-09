@@ -79,7 +79,7 @@ object ReviewSession {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "review session receiver registered")
     }
@@ -117,27 +117,40 @@ object ReviewSession {
         Log.i(TAG, "reveal: ${s.current?.front} back=${s.current?.back}")
     }
 
+    /** 评分在途标记：连点「记得/忘了」会把同一张卡评两次（丢一次更新或跳级） */
+    private val grading = java.util.concurrent.atomic.AtomicBoolean(false)
+
     fun grade(grade: Grade) {
+        // 在途互斥 + 必须已经翻面。
+        // 不加这两条的话：`repository.review` 是 read-modify-write，评分期间不更新
+        // state，第二次点击读到同一张卡会重复评（1d→6d 跳级）；若第一次已完成并
+        // 切到下一张，排队的第二次点击会直接盲评下一张（用户还没看到背面）。
+        if (!grading.compareAndSet(false, true)) return
         scope.launch {
-            val s = state.value ?: return@launch
-            val card = s.current ?: return@launch
-            DataGraph.repository.review(card.id, grade)
-            Log.i(
-                TAG,
-                "graded: ${card.front} grade=$grade (${s.index + 1}/${s.total})"
-            )
-            val next = s.index + 1
-            state.value = if (next >= s.total) {
-                Log.i(TAG, "session complete: ${s.total} card(s) reviewed")
-                // M13：完成音从最后一张卡的锚点位置发出（没有锚点就退化为无声）
-                SpatialCue.entityOf(card.id)?.let { entity ->
-                    scope.launch { SpatialCue.play(entity, SpatialCue.CUE_DONE) }
+            try {
+                val s = state.value ?: return@launch
+                if (!s.revealed) return@launch
+                val card = s.current ?: return@launch
+                DataGraph.repository.review(card.id, grade)
+                Log.i(
+                    TAG,
+                    "graded: ${card.front} grade=$grade (${s.index + 1}/${s.total})"
+                )
+                val next = s.index + 1
+                state.value = if (next >= s.total) {
+                    Log.i(TAG, "session complete: ${s.total} card(s) reviewed")
+                    // M13：完成音从最后一张卡的锚点位置发出（没有锚点就退化为无声）
+                    SpatialCue.entityOf(card.id)?.let { entity ->
+                        scope.launch { SpatialCue.play(entity, SpatialCue.CUE_DONE) }
+                    }
+                    // M14：复习完了就撤掉"该复习了"的提醒，别让它继续挂着
+                    appContext?.let { DueReminder.cancel(it) }
+                    null
+                } else {
+                    s.copy(index = next, revealed = false)
                 }
-                // M14：复习完了就撤掉"该复习了"的提醒，别让它继续挂着
-                appContext?.let { DueReminder.cancel(it) }
-                null
-            } else {
-                s.copy(index = next, revealed = false)
+            } finally {
+                grading.set(false)
             }
         }
     }

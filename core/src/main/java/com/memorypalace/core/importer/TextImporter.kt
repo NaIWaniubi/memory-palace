@@ -10,7 +10,7 @@ object TextImporter {
     private val SEPARATORS = listOf("\t", " :: ", "——", " - ")
 
     fun parse(text: String): List<ImportedCard> {
-        return text.lineSequence()
+        return text.removePrefix("\uFEFF").lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith("#") }
             .map { line ->

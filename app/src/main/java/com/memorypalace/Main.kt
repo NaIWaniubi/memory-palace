@@ -35,7 +35,7 @@ fun mainApp(scope: SpatialAppScope) =
             form = Form.Planar,
             defaultSize = WindowContainerSize(1280.dp, 720.dp),
             resizeType = ContainerResizeType.ContentSize,
-            enableMaterialBackground = true,
+            enableMaterialBackground = false,  // 深色面板由应用自己画，见 MpPanel
         ) {
             StudyPanel()
         }
@@ -46,7 +46,7 @@ fun mainApp(scope: SpatialAppScope) =
             form = Form.Planar,
             defaultSize = WindowContainerSize(420.dp, 560.dp),
             resizeType = ContainerResizeType.ContentSize,
-            enableMaterialBackground = true,
+            enableMaterialBackground = false,  // 深色面板由应用自己画，见 MpPanel
         ) {
             ReviewCard()
         }

@@ -53,7 +53,7 @@ object Clock {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "clock receiver registered")
     }

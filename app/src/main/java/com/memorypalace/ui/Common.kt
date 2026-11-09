@@ -98,6 +98,20 @@ fun StateCounter(component: String, instanceId: Int) {
 fun Lifecycle.Event.readable(): String = name
 
 /**
+ * 面板深色底（M15）。
+ *
+ * 为什么需要：窗口的 `enableMaterialBackground` 是浅色半透明材质，而我们的
+ * 文字近白（#E8EAF0）—— 叠在一起对比度约 1.2:1，正文基本不可读（2026-11-09
+ * 审查实测）。关掉系统材质底板、由应用自己画一层 94% 不透明的深色面板，
+ * 对比度拉到 12:1 以上，同时让三个窗口的外观可控。
+ */
+@Composable
+fun Modifier.mpPanel(): Modifier = this
+    .clip(RoundedCornerShape(MpShape.Block))
+    .background(MpColors.SurfaceDark.copy(alpha = 0.94f))
+    .padding(MpSpace.PanelMain)
+
+/**
  * 演示模式开关（M15）。演示模式开 = 干净的产品界面；关 = 探针全回来。
  *
  * 放在面板最底部、字号最小 —— 演示时它不占视觉重量，需要取证时点一下就有。

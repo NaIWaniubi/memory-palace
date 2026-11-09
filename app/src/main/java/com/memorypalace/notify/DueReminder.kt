@@ -83,7 +83,7 @@ object DueReminder {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "reminder broadcast receiver registered")
     }
@@ -95,38 +95,48 @@ object DueReminder {
     suspend fun schedule(context: Context) {
         val cards = DataGraph.repository.cards.first()
         val due = DataGraph.repository.dueQueue(cards)
-        if (due.isEmpty()) {
-            cancel(context)
-            Log.i(TAG, "no due card, reminder cancelled")
-            return
-        }
-
         val now = Clock.now()
-        // 提醒时刻的语义（这里踩过坑）：
-        // 到期队列里的卡 dueAt 可能全在**过去** —— 用户已经拖了几天没复习。
-        // 这时"最后一张卡"的到期时刻是过去时间，setExact 会立刻触发，
-        // 变成"刚排上就响"的空提醒，而且每次重排都重复发生。
+
+        // 提醒时刻的语义（这段踩过两个坑）：
         //
-        // 正确语义分两种情况：
-        //  1. 还有**未来**到期的卡 → 提醒设在那个时刻（"到点了，该复习了"）
-        //  2. 全部已经逾期 → 已经没有"未来的时刻"可等，立刻提醒一次
-        //     （"你有 N 张卡正在褪色，现在就来看"）
-        val future = due.filter { it.dueAt > now }
+        // 坑 1：拿"最后一张到期卡"的 dueAt 当提醒时刻。到期队列里的卡 dueAt
+        //       可能全在过去（用户拖了几天没复习），setExact 会立刻触发，
+        //       变成"刚排上就响"，且每次重排重复发生。
+        //
+        // 坑 2（更隐蔽，2026-11-09 审查发现）：先算 dueQueue 再在里面找
+        //       "未来到期"的卡 —— 但 dueQueue 的定义就是 dueAt <= now，
+        //       所以 future 永远为空，永远走"立刻提醒"分支。结果是这个功能
+        //       从来没真正"到点才响"过，日志里只有 overdue-immediate 一种。
+        //
+        // 正确语义：在**全部卡片**里找最近的未来到期时刻。
+        //   - 找到 → 那个时刻提醒（"到点了"）
+        //   - 全是逾期的 → 立刻提醒一次（"你有 N 张卡正在褪色"）
+        //   - 一张卡都没有 → 取消提醒
+        val nextFuture = cards.map { it.dueAt }.filter { it > now }.minOrNull()
+
         val fireAt: Long
         val mode: String
-        if (future.isNotEmpty()) {
-            fireAt = future.maxOf { it.dueAt }
-            mode = "scheduled"
-        } else {
-            fireAt = now + IMMEDIATE_DELAY_MILLIS
-            mode = "overdue-immediate"
+        when {
+            nextFuture != null -> {
+                fireAt = nextFuture
+                mode = "scheduled"
+            }
+            due.isNotEmpty() -> {
+                fireAt = now + IMMEDIATE_DELAY_MILLIS
+                mode = "overdue-immediate"
+            }
+            else -> {
+                cancel(context)
+                Log.i(TAG, "no card at all, reminder cancelled")
+                return
+            }
         }
 
         setAlarm(context, fireAt)
         Log.i(
             TAG,
             "reminder $mode: fireAt=$fireAt (${(fireAt - now) / 1000}s from now) " +
-                "dueCount=${due.size} futureCount=${future.size} top=${due.first().front}"
+                "cards=${cards.size} dueCount=${due.size} nextFuture=${nextFuture ?: "none"}"
         )
     }
 

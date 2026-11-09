@@ -95,7 +95,7 @@ object AnchorScene {
                 }
             },
             filter,
-            ContextCompat.RECEIVER_EXPORTED,
+            com.memorypalace.debugReceiverFlag,
         )
         Log.i(TAG, "anchor broadcast receiver registered")
     }
