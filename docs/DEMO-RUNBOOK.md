@@ -55,6 +55,20 @@ pico-cli emulator start --avd Pico_Emulator_6_1 --watch
 - 点「导入牌组」→ 系统文件选择器（**真机待验：PICO 上 SAF 选择器的呈现**）→ 选 CSV/TXT/apkg → 面板弹出**导入确认页**（文件名、格式、解析条数、前 5 条预览）→ 点「确认导入」→ 队列数字立即变化（实测 52→55，1.2 秒）。
 - 文件选择器打不开：用预置三套牌组（首次安装自动导入 50 张）兜底，话术「评审机已预装示例牌组」。
 
+## 4b. 无头验证导入的正确姿势（实测踩过）
+
+`card.PREVIEW --es path /sdcard/xxx.csv` 会报 `EACCES (Permission denied)` ——
+targetSdk 35 下应用没有宽泛存储权限。无头验证必须把文件放进应用私有目录：
+
+```bash
+adb push demo.csv /data/local/tmp/
+adb shell run-as com.memorypalace sh -c 'cat /data/local/tmp/demo.csv > files/demo.csv'
+adb shell am broadcast -a com.memorypalace.card.PREVIEW   --es path /data/data/com.memorypalace/files/demo.csv
+```
+
+成功日志：`preview ready: demo.csv format=csv parsed=N`。
+真机走 SAF「导入牌组」不受这个限制影响。
+
 ## 5. 收尾（2:40–3:00）
 
 - 点「开关随身卡窗口」演示窗口随手取放（关 0.7s / 开 3.0s）。
