@@ -39,7 +39,32 @@ pico-cli emulator start --avd Pico_Emulator_6_1 --watch
 - 点书房面板「进入房间层 (Full Space)」→ 约 1–2 秒进入房间，锚定卡片悬在放置时的位置。
 - 没看到卡片：点「返回共享空间」再进一次（实例号会 +1，属正常重建）。
 
-## 2. 走到卡片前复习一张（0:30–1:00）
+## 1b. 把一张卡贴到桌上（0:20–0:50，M16 新增，最强开场地）
+
+**真机（有手柄）**
+
+1. 进房间层后抬手柄，指向桌面 → 准星（◎）落到桌面上，书房面板「取点输入」显示「右手柄 → 桌面 1.2m」。
+2. 扣扳机 → 卡片出现在桌面上 2 cm 处，卡面朝你，底部一行「📍 钉在桌面上」。
+3. 走开两步再回头 → 卡还在桌上。这一下就是整个产品。
+
+**模拟器（没有手柄，`ControllerTrackingProvider = DEVICE_NOT_SUPPORTED`）**
+
+必须**说明是合成射线**，不能假装是手柄：
+
+```bash
+adb shell am broadcast -a com.memorypalace.anchor.AIM_BEGIN
+adb shell am broadcast -a com.memorypalace.anchor.AIM_SIMULATE     --ef ox -4.2471 --ef oy 2.2 --ef oz -3.3652 --ef dx 0 --ef dy -1 --ef dz 0
+adb shell am broadcast -a com.memorypalace.anchor.AIM_CONFIRM
+```
+
+话术：「模拟器没有手柄，所以我用一条注入射线代替手柄方向 —— 除了『位姿从哪来』，
+几何、落点、建锚、持久化走的是同一套代码。」（这句可以直接念，评委听得懂，也拆不掉。）
+
+**判过标准**：`adb logcat -s Aim:* Anchor:*` 里必须出现
+`命中 桌面 dist=...` → `createAnchor SUCCESS uuid=<真 UUID>` → `record persisted ... label=桌面`。
+三条缺一条就是没跑通。
+
+## 2. 走到卡片前复习一张（0:50–1:15）
 
 - 走近任意锚定卡片，点卡片上的「**复习这张**」（M11 新增，**真机待验：射线点击**）→ 随身卡窗口进入该卡的复习（正面 → 点「翻面」→ 点「记得/忘了」）。
 - 每步反馈 <1.5 秒。若按钮点不动：改用书房面板「开始复习」走全局队列（等效，评委看到的是同一个复习流）。
