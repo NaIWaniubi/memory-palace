@@ -28,9 +28,11 @@ pico-cli emulator start --avd Pico_Emulator_6_1 --watch
 1. 重新放卡：`adb shell am broadcast -a com.memorypalace.anchor.PLACE --ef x 0.0 --ef y 1.2 --ef z -1.5 --es front "..." --es back "..."`
 2. 重验位置：logcat 里应出现 `verifyRestored: ... drift=0.0m`
 
+**时间预算（实测）**：从模拟器挂掉到能演示约 **3 分钟**（重启 90s + 应用冷启 50s + 放卡 10s）。**超 60 秒就切兜底视频**。
+
 **注意**：模拟器端口不固定（见过 5554 与 5556），脚本别硬编码端口号。
 
-完整版见 [M12-M14-TEST.md §6](M12-M14-TEST.md)。
+完整版见 [M12-M14-TEST.md §6](M12-M14-TEST.md)（含端到端实测日志）。
 
 ## 1. 房间层看锚定卡片（0:00–0:30）
 
