@@ -46,7 +46,7 @@
 
 它**没有**证明什么：
 - ❌ 空间精度。真实头显上锚点会因漂移产生厘米级偏差，模拟器测不出来
-- ❌ 「卡片贴在冰箱上」这件事。UI 的放置用的是固定位姿 `(0.0, 1.2, -1.5)`，没有平面检测和手柄射线取点 —— 这一项是**未实现**，不是「已验证」
+- ~~❌ 「卡片贴在冰箱上」这件事~~ —— **2026-11-10 已由 M16 补齐**：平面检测 + 家具语义 + 射线取点已实现并在模拟器实测通过（57 个平面、桌面命中、真实锚点）。见 [PLANE-ANCHOR.md](PLANE-ANCHOR.md)。本节其余结论（UUID 可重解析、回退位姿）仍然有效。
 
 **因此：对外材料里不再出现「恢复漂移 0.0m」这种写法**，改成「按 UUID 重新解析成功」。真机精度要等借到设备后用物理参照物测（12/25 陌生场地实测会顺带做）。
 
@@ -95,5 +95,5 @@ System.loadLibrary ← com.pico.spatial.runtime.Client.<clinit> (Client.java:36)
 ## 遗留问题（如实记录）
 
 - **`openStage` 在 Shared Space 返回 `NotAllowed`**：本轮 closeStage 成功后，openStage 连续三次 NotAllowed（包括先开窗口再调），与 M1（同流程成功）行为不一致。怀疑与挂屏的 ANR 弹窗有关（系统判定应用无响应时拒绝进入 Full Space）。临时绕过：杀进程重启即恢复（重启后直接进 Full Space）。待真机验证；若真机复现则升级为 P0。
-- 「用户指向平面放锚点」的**手势指向取点**未实现：模拟器无空间交互，当前用广播参数代替。真机后接手柄射线 + 平面求交。
-- 锚点与真实平面的贴合（识别桌面/墙面法线）未做，M2 按约定不追求网格贴合。
+- ~~「用户指向平面放锚点」的**手势指向取点**未实现~~ —— **已实现（M16）**：`AimPlacement` 同时接手柄（`ControllerTrackingProvider`）与手势（`HandTrackingProvider`），判定逻辑在 `core/.../PlanePicker`（26 例单测）。模拟器实测：`ControllerTrackingProvider = DEVICE_NOT_SUPPORTED`、`HandTrackingProvider = SUPPORTED`，因此扳机这一步仍需真机。见 [PLANE-ANCHOR.md](PLANE-ANCHOR.md)。
+- ~~锚点与真实平面的贴合（识别桌面/墙面法线）未做~~ —— **M16 已实现**（2026-11-10）：`PlaneTrackingManager` 给平面 + 24 类语义，法线由多边形叉积或朝向枚举推出，`AimPlacement` 做射线求交。见 [PLANE-ANCHOR.md](PLANE-ANCHOR.md)。

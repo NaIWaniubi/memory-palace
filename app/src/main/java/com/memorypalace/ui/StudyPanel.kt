@@ -113,6 +113,10 @@ fun StudyPanel() {
 
         TimeMachineView()
 
+        // M16：房间平面 + 手柄取点。放在到期队列上面，因为"贴到家具上"是
+        // 演示的第一个动作，队列是第二个。
+        PlacementPanel()
+
         DueQueueView()
 
         if (!demo) {
@@ -190,6 +194,10 @@ fun DueQueueView() {
     val session by ReviewSession.state.collectAsState()
     val scope = rememberCoroutineScope()
     val demo by DemoMode.enabled.collectAsState()
+    // M16：判断"能不能用手柄取点"，决定按钮走哪条路。
+    // 只看 aimActive（真的指着某个平面），不看"有没有平面/有没有设备"——
+    // 后者会给出假的可行状态，点了按钮卡在等扳机里出不来。
+    val aimActive by com.memorypalace.spatial.AimPlacement.aimActive.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(MpSpace.Sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
@@ -214,17 +222,22 @@ fun DueQueueView() {
                     "· ${c.front} — ${c.back}（reps=${c.repetitions} ef=${"%.2f".format(c.easiness)} 间隔=$intervalText id=${c.id.take(8)}）",
                     fontSize = MpType.BodySmall,
                 )
-                // 放置动作的真实入口：把到期卡钉进房间。
-                // 位姿按已有锚点数轮转，避免所有卡叠在同一个点（曾经的画面问题：
-                // 4 张卡的文字挤成一团，看上去像一坨）。
-                // 注意：这不是"贴合真实家具表面"——那是真机才有的平面检测 + 手柄取点，
-                // 目前未实现。这里只是几个预设位置。
+                // 放置动作：能用取点就走取点（卡片真的贴在识别出的平面上），
+                // 否则按已有锚点数轮转预设位，避免所有卡叠在同一个点。
+                // 放置入口（M16 改进）：优先走手柄/手势取点 —— 那是"贴在家具上"；
+                // 没有平面检测或没有输入设备时退回预设位，并在按钮上写清楚是哪一种，
+                // 不允许用预设位冒充真实取点。
                 if (i == 0) {
+                    val canAim = aimActive
                     Button(onClick = {
-                        val slot = PLACE_SLOTS[AnchorScene.records.value.size % PLACE_SLOTS.size]
-                        AnchorScene.placeForCard(c.id, slot.first, slot.second, slot.third)
+                        if (canAim) {
+                            AnchorScene.beginAimPlacement(c.id)
+                        } else {
+                            val slot = PLACE_SLOTS[AnchorScene.records.value.size % PLACE_SLOTS.size]
+                            AnchorScene.placeForCard(c.id, slot.first, slot.second, slot.third)
+                        }
                     }) {
-                        MpText("钉入房间", fontSize = MpType.Caption)
+                        MpText(if (canAim) "🎯 手柄放置" else "钉入房间", fontSize = MpType.Caption)
                     }
                 }
             }
@@ -271,9 +284,12 @@ fun DueQueueView() {
 }
 
 /**
- * 放置预设位（米，相对房间原点；眼高约 1.6m）。
- * 四个高度/左右不同的位置，让多张卡在画面里分得开。
- * 真机上这些位置应当由手柄射线 + 平面检测决定，目前未实现。
+ * 回退放置位（米，相对房间原点；眼高约 1.6m）。
+ *
+ * M16 起这只在两种情况下生效：设备没有平面检测（模拟器），或没有手柄/手势输入。
+ * 真机上走的是「手柄射线 → 打到识别出的平面 → 建锚点」（见 spatial/AimPlacement）。
+ * 保留这几个坐标是为了让没有真机的环境也能演示"卡片进入房间"，
+ * 界面上按钮会区分「🎯 手柄放置」和「钉入房间」，不混淆两者。
  */
 private val PLACE_SLOTS = listOf(
     Triple(0.0f, 1.15f, -1.30f),   // 正前偏下（床/沙发高度）

@@ -194,7 +194,7 @@ I DueReminder: reminder cancelled
 | **冷启动耗时** —— 真机 arm64 原生应显著快于模拟器 12s | `docs/M12-M14-TEST.md` §7 |
 | **锚点在设备重启后的存续** —— 模拟器实例重建必丢，真机是否持久未验 | `docs/M12-M14-TEST.md` §7；`docs/ANCHOR-M2-TEST.md` §边界条件 |
 | **系统级返回（摘头显 / 系统手势）行为** —— 退出 Full Space 的系统级路径 | `docs/DUAL-STATE-TEST.md` §对产品的影响 |
-| **手势指向放锚点** —— 真机后接手柄射线 + 平面求交（当前用广播参数代替） | `docs/ANCHOR-M2-TEST.md` §遗留问题 |
+| ~~**手势指向放锚点**~~ —— **M16 已实现**：手柄/手势射线 → 平面求交 → 世界锚点 | `docs/PLANE-ANCHOR.md` |
 | **启动 ANR 是否复现** —— 判定为模拟器独有问题（栈顶全在 `libhoudini.so` ARM 转译层），真机复现则升级为 P0 | `docs/ANCHOR-M2-TEST.md` §ANR 定性；`docs/DUAL-STATE-TEST.md` §未能验证 / 遗留问题 |
 | **`openStage` 在 Shared Space 返回 `NotAllowed`** —— 本轮连续三次 NotAllowed，与 M1 行为不一致，怀疑与挂屏 ANR 弹窗有关；真机复现则升级为 P0 | `docs/ANCHOR-M2-TEST.md` §遗留问题 |
 
@@ -212,7 +212,7 @@ PICO 官方明示：模拟器**无法驱动 3D 空间按钮**。因此以下能�
 | 随身卡开关 | `am broadcast -a com.memorypalace.dualstate.TOGGLE_REVIEW_CARD` | 同上 |
 | 放锚点 / 清锚点 | `am broadcast -a com.memorypalace.anchor.PLACE / CLEAR`（带 `--ef x/y/z`） | `docs/ANCHOR-M2-TEST.md` §实现形态 |
 | 窗口拖动、缩放 | **无替代** —— 声明了 `resizeType = ContentSize` 但触发不了 | `docs/DUAL-STATE-TEST.md` §未能验证 / 遗留问题；`docs/M12-M14-TEST.md` §7 |
-| 手势 / 手柄 3D 交互 | **无替代** —— 手势指向取点未实现 | `docs/ANCHOR-M2-TEST.md` §遗留问题 |
+| 手势 / 手柄 3D 交互 | **M16 已实现**：手柄/手势射线 → 平面求交；模拟器上手柄为 `DEVICE_NOT_SUPPORTED`，扳机需真机 | `docs/PLANE-ANCHOR.md` |
 | 空间音频方位 | **无替代** —— 模拟器无空间音频输出路径 | `docs/M12-M14-TEST.md` §3 |
 | 系统通知面板 | **无替代** —— 模拟器无系统通知面板 | `docs/M12-M14-TEST.md` §7 |
 
@@ -261,11 +261,11 @@ W DueReminder: exact alarm not permitted, fell back to inexact alarm at ...
 | 5 | **冷启动耗时**（真机 arm64 原生应显著快于模拟器 12s） | 模拟器走 x86 转译 | `docs/M12-M14-TEST.md` §7 |
 | 6 | **锚点在设备重启后的存续** | 模拟器实例重建必丢；真机是否持久未验 | `docs/M12-M14-TEST.md` §7；`docs/ANCHOR-M2-TEST.md` §边界条件 |
 | 7 | **Full Space 下的手势 / 手柄输入模型** | 同属模拟器边界 | `docs/DUAL-STATE-TEST.md` §未能验证 / 遗留问题 |
-| 8 | **手势指向放锚点**（手柄射线 + 平面求交） | 模拟器无空间交互，当前用广播参数代替 | `docs/ANCHOR-M2-TEST.md` §遗留问题 |
+| 8 | ~~**手势指向放锚点**（手柄射线 + 平面求交）~~ | **M16 已关闭**：模拟器注入射线实测通过；手柄/手势输入源在真机验 | `docs/PLANE-ANCHOR.md` |
 | 9 | **系统级返回（摘头显 / 系统手势）退出 Full Space 的行为** | 模拟器只能触发应用内广播入口 | `docs/DUAL-STATE-TEST.md` §对产品的影响 |
 | 10 | **启动 ANR 是否在真机复现** | 判定为模拟器独有问题（`libhoudini.so` 转译开销），真机复现则升级为 P0 | `docs/ANCHOR-M2-TEST.md` §ANR 定性；`docs/DUAL-STATE-TEST.md` §未能验证 / 遗留问题 |
 | 11 | **`openStage` 在 Shared Space 返回 `NotAllowed`** 是否真机复现 | 与 M1 同流程成功的行为不一致，怀疑与 ANR 弹窗有关；真机复现则升级为 P0 | `docs/ANCHOR-M2-TEST.md` §遗留问题 |
-| 12 | **锚点与真实平面的贴合**（识别桌面 / 墙面法线） | M2 按约定不追求网格贴合，未做 | `docs/ANCHOR-M2-TEST.md` §遗留问题 |
+| 12 | ~~**锚点与真实平面的贴合**~~ | **M16 已实现**：`PlaneTrackingManager` + 语义 + 法线；模拟器实测 57 平面、桌面命中、锚点落位准确 | `docs/PLANE-ANCHOR.md` |
 
 ---
 

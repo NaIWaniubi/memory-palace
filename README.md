@@ -17,7 +17,11 @@
 
 记忆宫殿是一款 PICO MR 空间记忆应用：把 Anki 式卡片**用系统级空间锚点固定在房间里的坐标上**，由 SM-2 两档调度复习，空间音频从卡片所在位置发声。
 
-> **一句实话**：放置目前用四个预设坐标（正前方偏下 / 左侧 / 右侧 / 高处），**没有做平面检测和手柄射线取点** —— 也就是说「贴在冰箱上」现在靠你把卡放在冰箱那个方向，不是系统认出冰箱。那是真机阶段的活，功能矩阵里标了 ❌。
+> **一句实话（2026-11-10 更新）**：平面检测 + 家具语义 + 射线取点，**已经实现了，而且模拟器上就能验**。
+>
+> 一次进入房间层识别出 **57 个平面**，带家具级语义（地板 / 天花板 / 墙 / 门 / 窗 / 桌面 / 柜子 / 椅子 / 床 / 窗帘）。注入射线打到「桌面」，落点 `(-4.2471, 1.104, -3.3652)`，建出的真实世界锚点落在 `y = 1.124`（命中点 + 2 cm 抬升），持久层记 `label=桌面`，卡片显示「📍 钉在桌面上」。
+>
+> 还不诚实的部分写在功能矩阵里：**模拟器没有手柄**（`ControllerTrackingProvider` 返回 `DEVICE_NOT_SUPPORTED`），所以"扣扳机"这一步只能在真机验证；被验证的是除"位姿从哪来"之外的全部链路（几何判定 → 准星 → 落点 → 建锚 → 持久化）。
 
 [![CI](https://github.com/NaIWaniubi/memory-palace/actions/workflows/ci.yml/badge.svg)](https://github.com/NaIWaniubi/memory-palace/actions/workflows/ci.yml)
 
@@ -36,7 +40,7 @@ pico-cli app launch                               # 3. 启动应用
 
 约 12 秒后三窗出现（模拟器**热启动**实测，x86 转译；**全新安装首次因 dex 校验约 27–80 秒**；真机 arm64 原生更快）。首次启动会自动导入三套示例牌组（50 张），开箱即可复习。
 
-**本仓库已在干净克隆下验证**（2026-11-09，同机）：`git clone` → `:core:test` 42 例全绿 → `:app:assembleDebug` 产出 30 MB APK。克隆约 70 秒（含 44MB 演示视频）。**跨机器验证待补**。
+**本仓库已在干净克隆下验证**（2026-11-09，同机）：`git clone` → `:core:test` 68 例全绿 → `:app:assembleDebug` 产出 30 MB APK。克隆约 70 秒（含 44MB 演示视频）。**跨机器验证待补**。
 
 只跑算法单测不需要 Android SDK：`./gradlew :core:test`（`core/` 是纯 JVM 模块，零 SDK 依赖）。
 
@@ -48,8 +52,10 @@ pico-cli app launch                               # 3. 启动应用
 |---|---|---|
 | 三窗架构（书房看板 / 随身卡 / 房间层） | ✅ 模拟器已实测 | [双态结论](docs/DUAL-STATE-VERIFICATION.md) |
 | 空间锚定：系统锚点创建 + 杀进程后按 UUID 重新解析 | ✅ 模拟器已实测（**是「UUID 可重解析」，不是空间精度**，见下注） | [锚定结论](docs/ANCHOR-M2-TEST.md) |
-| **把卡放到任意位置 / 贴合真实家具表面** | ❌ **未实现**：UI 只有固定位姿，无平面检测与手柄射线取点 | [锚定结论「遗留问题」](docs/ANCHOR-M2-TEST.md) |
-| SM-2 两档调度（1 天 → 6 天 → ×EF） | ✅ 已实现，42 例单测全绿 | [算法说明](docs/ALGORITHM.md) |
+| **平面检测 + 家具语义** | ✅ 模拟器已实测：57 个平面，含地板/天花板/墙/门/窗/桌面/柜子/椅子/床/窗帘 | [平面锚定结论](docs/PLANE-ANCHOR.md) |
+| **射线取点 → 任意位置放置** | ✅ 模拟器已实测（注入射线）：命中点 → 真实世界锚点，落点误差 0，抬升 2 cm | [平面锚定结论](docs/PLANE-ANCHOR.md) |
+| **手柄扳机 / 手势捏合确认** | ⚠️ 模拟器 `ControllerTrackingProvider = DEVICE_NOT_SUPPORTED`，扳机这一下只能真机验 | [平面锚定结论](docs/PLANE-ANCHOR.md) |
+| SM-2 两档调度（1 天 → 6 天 → ×EF） | ✅ 已实现，68 例单测全绿（含 26 例平面几何） | [算法说明](docs/ALGORITHM.md) |
 | 看得见的遗忘（卡片随逾期褪色） | ✅ 模拟器已实测 | [时间机器结论](docs/M6-TIME-MACHINE-TEST.md) |
 | 复习流（队列 → 翻面 → 自评 → 调度更新） | ✅ 模拟器已实测 | [复习流结论](docs/M4-REVIEW-FLOW-TEST.md) |
 | CSV / TXT / Anki apkg（anki2 / anki21）导入 + 字段映射确认页 | ✅ 模拟器已实测（**anki21b/zstd 未支持**） | [导入管线](docs/M5-IMPORT-PIPELINE-TEST.md) · [确认页](docs/M8-IMPORT-CONFIRM-TEST.md) |

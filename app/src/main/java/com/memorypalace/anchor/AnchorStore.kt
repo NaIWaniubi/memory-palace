@@ -12,6 +12,12 @@ data class AnchorRecord(
     val px: Float, val py: Float, val pz: Float,
     val pitch: Float, val yaw: Float, val roll: Float,
     val placedAt: Long,
+    /**
+     * M16：落点的语义名（「桌面」「沙发」「墙」…）。
+     * 卡片上直接写「钉在桌面上」—— 这是"记忆宫殿"与"随便放个窗口"的分界线。
+     * 旧记录没有这个字段，读出来是 null，卡片退回显示锚点 UUID。
+     */
+    val anchorLabel: String? = null,
 )
 
 /**
@@ -40,6 +46,11 @@ class AnchorStore(context: Context) {
                     yaw = o.getDouble("yaw").toFloat(),
                     roll = o.getDouble("roll").toFloat(),
                     placedAt = o.getLong("placedAt"),
+                    // 旧版本写入的记录没有这个键，不能直接 getString（会抛 JSONException
+                    // 并被外层 getOrElse 吞成"全部记录丢失"，那是最坏的结果）
+                    anchorLabel = if (o.has("anchorLabel") && !o.isNull("anchorLabel")) {
+                        o.getString("anchorLabel")
+                    } else null,
                 )
             }
         }.getOrElse { emptyList() }
@@ -55,6 +66,7 @@ class AnchorStore(context: Context) {
                 put("px", r.px.toDouble()); put("py", r.py.toDouble()); put("pz", r.pz.toDouble())
                 put("pitch", r.pitch.toDouble()); put("yaw", r.yaw.toDouble()); put("roll", r.roll.toDouble())
                 put("placedAt", r.placedAt)
+                put("anchorLabel", r.anchorLabel ?: JSONObject.NULL)
             })
         }
         prefs.edit().putString(KEY_RECORDS, arr.toString()).apply()

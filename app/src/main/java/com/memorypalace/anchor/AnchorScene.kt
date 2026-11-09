@@ -38,6 +38,12 @@ object AnchorScene {
     const val TAG = "Anchor"
     const val ACTION_PLACE = "com.memorypalace.anchor.PLACE"
     const val ACTION_CLEAR = "com.memorypalace.anchor.CLEAR"
+    /** M16：无头触发取点放置（模拟器没有扳机，用它验证"瞄准→提交"这条链路）。 */
+    const val ACTION_AIM_BEGIN = "com.memorypalace.anchor.AIM_BEGIN"
+    const val ACTION_AIM_CONFIRM = "com.memorypalace.anchor.AIM_CONFIRM"
+    const val ACTION_AIM_CANCEL = "com.memorypalace.anchor.AIM_CANCEL"
+    /** M16：无头注入一条合成瞄准（没有真机时验证 UI 与落点计算）。 */
+    const val ACTION_AIM_SIMULATE = "com.memorypalace.anchor.AIM_SIMULATE"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var store: AnchorStore
@@ -76,6 +82,10 @@ object AnchorScene {
         val filter = IntentFilter().apply {
             addAction(ACTION_PLACE)
             addAction(ACTION_CLEAR)
+            addAction(ACTION_AIM_BEGIN)
+            addAction(ACTION_AIM_CONFIRM)
+            addAction(ACTION_AIM_CANCEL)
+            addAction(ACTION_AIM_SIMULATE)
         }
         ContextCompat.registerReceiver(
             context.applicationContext,
@@ -89,8 +99,36 @@ object AnchorScene {
                             front = intent.getStringExtra("front")
                                 ?: intent.getStringExtra("title") ?: "测试卡片",
                             back = intent.getStringExtra("back") ?: "",
+                            yaw = intent.getFloatExtra("yaw", 0f),
+                            label = intent.getStringExtra("label"),
                         )
                         ACTION_CLEAR -> clear()
+                        ACTION_AIM_BEGIN -> {
+                            // card 缺省用第一张未锚定的卡 —— 无头验证时少一个参数。
+                            // 必须切协程：读卡片要查 Room，广播回调在主线程，同步查会 ANR
+                            val explicit = intent.getStringExtra("card")
+                            scope.launch {
+                                val id = explicit ?: firstUnanchoredCardId()
+                                if (id == null) Log.w(TAG, "AIM_BEGIN: 没有未锚定的卡片")
+                                else beginAimPlacement(id)
+                            }
+                        }
+                        ACTION_AIM_CONFIRM -> com.memorypalace.spatial.AimPlacement.confirmManually()
+                        ACTION_AIM_CANCEL -> cancelAimPlacement()
+                        ACTION_AIM_SIMULATE -> {
+                            com.memorypalace.spatial.AimPlacement.simulateRay(
+                                origin = com.memorypalace.core.spatial.Vec3(
+                                    intent.getFloatExtra("ox", 0f),
+                                    intent.getFloatExtra("oy", 1.6f),
+                                    intent.getFloatExtra("oz", 0f),
+                                ),
+                                direction = com.memorypalace.core.spatial.Vec3(
+                                    intent.getFloatExtra("dx", 0f),
+                                    intent.getFloatExtra("dy", -1f),
+                                    intent.getFloatExtra("dz", 0f),
+                                ),
+                            )
+                        }
                     }
                 }
             },
@@ -100,19 +138,32 @@ object AnchorScene {
         Log.i(TAG, "anchor broadcast receiver registered")
     }
 
+    /**
+     * 无头取点用：第一张还没进房间的卡片。
+     * suspend：读卡片要走 Room 查询，不能在广播回调的主线程上同步做。
+     */
+    private suspend fun firstUnanchoredCardId(): String? = runCatching {
+        val cards = DataGraph.repository.cards.first()
+        val anchored = records.value.map { it.key }.toSet()
+        cards.firstOrNull { it.id !in anchored }?.id
+    }.getOrElse {
+        Log.w(TAG, "firstUnanchoredCardId failed", it)
+        null
+    }
+
     /** 在指定位姿放一个锚点并持久化；M3 起同时建卡，记录 key = 卡片 ID。 */
-    fun place(x: Float, y: Float, z: Float, front: String, back: String) {
+    fun place(x: Float, y: Float, z: Float, front: String, back: String, yaw: Float = 0f, label: String? = null) {
         scope.launch {
             val card = DataGraph.repository.add(front, back)
-            bind(card.id, if (back.isBlank()) front else "$front  $back", x, y, z)
+            bind(card.id, if (back.isBlank()) front else "$front  $back", x, y, z, yaw, label)
         }
     }
 
     /**
-     * 把已有卡片钉进房间（演示路径修复：放置动作的真实 UI 入口用）。
+     * 把已有卡片钉进房间（预设位姿路径：没有平面检测/没有手柄时的回退）。
      * 不新建卡、不重复锚定；位姿缺省由调用方给（如面板按钮用预设面前位姿）。
      */
-    fun placeForCard(cardId: String, x: Float, y: Float, z: Float) {
+    fun placeForCard(cardId: String, x: Float, y: Float, z: Float, yaw: Float = 0f, label: String? = null) {
         scope.launch {
             val card = DataGraph.repository.cards.first().firstOrNull { it.id == cardId }
             if (card == null) {
@@ -123,15 +174,88 @@ object AnchorScene {
                 Log.i(TAG, "placeForCard: already anchored ${card.front}, skip")
                 return@launch
             }
-            bind(card.id, "${card.front}  ${card.back}", x, y, z)
+            bind(card.id, "${card.front}  ${card.back}", x, y, z, yaw, label)
         }
     }
 
-    /** 建锚 + 落记录 + 持久化（place / placeForCard 共用）。 */
-    private suspend fun bind(cardId: String, title: String, x: Float, y: Float, z: Float) {
-        Log.i(TAG, "createAnchor requested pos=($x,$y,$z) card=${cardId.take(8)}")
+    // ---------- M16：手柄 / 手势取点放置 ----------
+
+    /** 正在等扳机的卡片 ID；null = 不在放置模式。 */
+    val aimTarget = MutableStateFlow<String?>(null)
+
+    /**
+     * 取点是否可用：已识别到平面，**并且**当前真的指着某个平面。
+     *
+     * 第二个条件很关键。只看"有平面 + 有输入设备"会在模拟器上给出假的可行状态：
+     * 平面有 57 个、手势跟踪也返回 SUPPORTED，但没有人真的在指 —— 用户点了
+     * 取点按钮之后会卡在"等扳机"里出不来。
+     */
+    fun canAimPlace(): Boolean =
+        com.memorypalace.spatial.PlaneSensor.planes.value.isNotEmpty() &&
+            com.memorypalace.spatial.AimPlacement.aimActive.value
+
+    /**
+     * 进入取点放置模式：瞄准任意已识别平面，按扳机 / 捏合确认。
+     *
+     * 确认回调里立刻退出模式（幂等）—— 扳机容易连发，不退出会把同一张卡
+     * 在相邻两帧建出两个锚点，卡片就重叠成一片。
+     */
+    fun beginAimPlacement(cardId: String) {
+        if (records.value.any { it.key == cardId }) {
+            Log.i(TAG, "beginAimPlacement: $cardId 已锚定，忽略")
+            return
+        }
+        aimTarget.value = cardId
+        com.memorypalace.spatial.AimPlacement.onTrigger = { aim ->
+            val pending = aimTarget.value
+            if (pending == null) {
+                Log.i(TAG, "扳机确认但已退出放置模式，忽略")
+            } else {
+                aimTarget.value = null
+                com.memorypalace.spatial.AimPlacement.onTrigger = null
+                Log.i(
+                    TAG,
+                    "aim placement committed card=${pending.take(8)} plane=${aim.planeLabel} " +
+                        "point=(${aim.point.x},${aim.point.y},${aim.point.z}) yaw=${aim.yawDeg}"
+                )
+                val lift = com.memorypalace.core.spatial.PlanePicker.lift(aim.point, aim.normal)
+                scope.launch {
+                    val card = DataGraph.repository.cards.first().firstOrNull { it.id == pending }
+                    if (card == null) {
+                        Log.w(TAG, "aim commit: card not found $pending")
+                        return@launch
+                    }
+                    bind(
+                        cardId = card.id,
+                        title = "${card.front}  ${card.back}",
+                        x = lift.x, y = lift.y, z = lift.z,
+                        yaw = aim.yawDeg,
+                        label = aim.planeLabel,
+                    )
+                }
+            }
+        }
+        Log.i(TAG, "aim placement mode entered for card=${cardId.take(8)}")
+    }
+
+    fun cancelAimPlacement() {
+        if (aimTarget.value == null) return
+        aimTarget.value = null
+        com.memorypalace.spatial.AimPlacement.onTrigger = null
+        Log.i(TAG, "aim placement mode cancelled")
+    }
+
+    /** 建锚 + 落记录 + 持久化（place / placeForCard / 取点放置共用）。 */
+    private suspend fun bind(
+        cardId: String,
+        title: String,
+        x: Float, y: Float, z: Float,
+        yaw: Float = 0f,
+        label: String? = null,
+    ) {
+        Log.i(TAG, "createAnchor requested pos=($x,$y,$z) yaw=$yaw label=$label card=${cardId.take(8)}")
         val result = WorldTrackingManager.createAnchor(
-            Vector3(x, y, z), EulerAngles(0f, 0f, 0f), "mp:${cardId.take(8)}"
+            Vector3(x, y, z), EulerAngles(0f, yaw, 0f), "mp:${cardId.take(8)}"
         )
         val rec = when (result) {
             is WorldTrackingResult.Success -> {
@@ -152,6 +276,7 @@ object AnchorScene {
                     px = t.position.x, py = t.position.y, pz = t.position.z,
                     pitch = t.rotation.pitch, yaw = t.rotation.yaw, roll = t.rotation.roll,
                     placedAt = System.currentTimeMillis(),
+                    anchorLabel = label,
                 )
             }
             is WorldTrackingResult.Error -> {
@@ -162,8 +287,9 @@ object AnchorScene {
                     uuid = null,
                     title = title,
                     px = x, py = y, pz = z,
-                    pitch = 0f, yaw = 0f, roll = 0f,
+                    pitch = 0f, yaw = yaw, roll = 0f,
                     placedAt = System.currentTimeMillis(),
+                    anchorLabel = label,
                 )
             }
             else -> {
@@ -175,7 +301,7 @@ object AnchorScene {
         store.save(records.value)
         // M13：放置确认音排队，等 RoomStage 把卡片实体建出来后再从该位置播
         enqueueCue(cardId, SpatialCue.CUE_PLACE)
-        Log.i(TAG, "record persisted key=${rec.key} uuid=${rec.uuid} total=${records.value.size}")
+        Log.i(TAG, "record persisted key=${rec.key} uuid=${rec.uuid} label=${rec.anchorLabel} total=${records.value.size}")
     }
 
     fun clear() {

@@ -89,6 +89,15 @@ fun AnchorCard(rec: AnchorRecord) {
                 color = if (fade > 0f) MpColors.Warning else MpColors.Success,
             )
         }
+        // M16：落点语义名是产品功能，不是调试信息 —— 演示模式下也要显示。
+        // 「钉在桌面上」这一行就是记忆宫殿和"随便放个窗口"的区别所在。
+        rec.anchorLabel?.let { label ->
+            Text(
+                "📍 钉在${com.memorypalace.spatial.PlaneSemantics.anchorPhrase(label)}",
+                fontSize = MpType.Caption,
+                color = MpColors.Accent,
+            )
+        }
         if (!demo) {
             Text(
                 if (rec.uuid != null) "锚点 ${rec.uuid.take(8)}…" else "未锚定（回退位姿）",
