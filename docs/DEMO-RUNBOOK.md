@@ -11,6 +11,27 @@
 - 应看到：书房面板（大窗）+ 随身复习卡（小窗）+ 身后房间层。窗口冷启动自动打开（M11 修复前需 adb，已修）。
 - 没看到窗口：完全退出应用（多任务里划掉）重开一次；仍没有 → 放弃现场演示，切录屏视频。
 
+## 0b. 投屏模拟器路演：模拟器挂了怎么办（备用操作员看）
+
+> 模拟器被内存压力杀掉是**已知会发生的事**（宿主机空闲 ~5.6GB ＜ 官方建议 12GB）。
+> `--watch` 救不回来 —— 它会拒绝重启并报 "refusing to launch a second instance"。
+> **口令：60 秒内没恢复就切兜底视频，不道歉不解释。**
+
+```
+tasklist | grep -iE "emulator|qemu"           # 找僵尸进程
+taskkill //PID <pid> //F                       # 杀掉（Git Bash 里要用 //PID）
+pico-cli emulator start --avd Pico_Emulator_6_1 --watch
+```
+
+恢复后**必须重做两件事**（模拟器重启会丢系统锚点）：
+
+1. 重新放卡：`adb shell am broadcast -a com.memorypalace.anchor.PLACE --ef x 0.0 --ef y 1.2 --ef z -1.5 --es front "..." --es back "..."`
+2. 重验位置：logcat 里应出现 `verifyRestored: ... drift=0.0m`
+
+**注意**：模拟器端口不固定（见过 5554 与 5556），脚本别硬编码端口号。
+
+完整版见 [M12-M14-TEST.md §6](M12-M14-TEST.md)。
+
 ## 1. 房间层看锚定卡片（0:00–0:30）
 
 - 点书房面板「进入房间层 (Full Space)」→ 约 1–2 秒进入房间，锚定卡片悬在放置时的位置。

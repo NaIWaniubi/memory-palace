@@ -30,6 +30,35 @@
 2. **锚点服务冷启动有延迟**：应用启动后头几十秒 `createAnchor` 返回 `code=-6 The provider is not ready`，之后正常。产品含义：进入房间层后「放置」按钮要有就绪状态管理（灰态/重试），不能假设随时可放。已按回退位姿兜底。
 3. **回退路径有效**：uuid=null 的记录按保存位姿直渲，视觉位置正确（m2-01 床面卡片）。真机上锚点丢失（搬家/陌生场地）时可用同一机制降级。
 
+## 边界条件：drift 0.0m 的成立范围（2026-11-09 补充）
+
+**这一节修正一个可能被过度解读的表述。**
+
+「杀进程重启后 drift 0.0m」成立于**同一个模拟器实例内**——系统级锚点服务（`WorldTrackingManager`）随模拟器进程存活，锚点 UUID 在其内部持久化。
+
+**跨模拟器实例重建时，系统锚点会丢**。2026-11-09 实测：模拟器因内存压力被外部 kill 后重建，之前创建的系统锚点全部失效：
+
+```
+W Anchor: verifyRestored: batch loadAnchor ERROR code=-7 msg=The specified anchor was not found.，逐条重试
+E Anchor: verifyRestored: uuid=a572e6cb-… NOT resolved code=-7 msg=The specified anchor was not found.
+W Anchor: downgraded 1 lost anchor(s) to fallback pose: [a572e6cb-…]
+I DualState: [room_stage] inst#1 SpatialView.initial anchors=2     ← 两条记录都还在
+```
+
+**这不是 bug，是降级路径按设计工作**：锚点丢失 → 记录降级为 uuid=null → 场景按保存位姿直渲 → **卡片不消失**。这正是方案 L4 降级形态里说的"会话内记忆 + 幽灵态重放"。
+
+**但它对创新分有影响，必须说清楚**：
+
+| 表述 | 准确性 |
+|---|---|
+| 「锚点持久化，杀进程重进可找回，drift 0.0m」 | ✅ 准确 —— 指**同一模拟器实例内**的应用进程被杀重启 |
+| 「锚点在设备重启后仍在」 | ❌ **未验证** —— 模拟器实例重建会丢；真机行为待验 |
+| 「锚点在搬家/陌生场地后仍在」 | ❌ **明确不会** —— 系统锚点绑定当前空间，换场地必丢（这正是 L4 降级存在的原因） |
+
+**答辩时若被问「锚点会不会丢」**，正确答案是：「设备不重启、应用不被杀时不会丢；设备重启或换场地会丢，所以我们做了降级 —— 卡片会按最后记录的位姿继续在房间里，不会凭空消失。**决赛现场就是靠这个降级兜底**，12/25 会实测陌生场地找回率。」
+
+**模拟器实例重建会丢锚点，真机行为待验** —— 这一条列入 `docs/M12-M14-TEST.md` 的待真机清单。
+
 ## ANR 定性（M1 遗留，本轮查清）
 
 拉取 `/data/anr/` 两个 trace，均为 `com.memorypalace` 且 subject = **"failed to complete startup"**。主线程栈：

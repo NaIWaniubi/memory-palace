@@ -142,6 +142,8 @@ M12 改动了 manifest 与入口 Activity（启动路径），所以把**创新�
 
 **放卡 → 杀进程 → 重进 → 找回，drift 仍然 0.0m。** 这是 `docs/COMPETITORS.md` §5.2 差异点 1 的证据支撑 —— AR 词典类竞品靠实时相机识别，移开相机就失效；我们是系统级持久锚点，这一轮复核确认该结论在 M12 修订后依然成立。
 
+> ⚠️ **成立范围**：同一模拟器实例内。模拟器实例重建后系统锚点会丢（降级路径正常工作，卡片不消失）—— 详见 `docs/ANCHOR-M2-TEST.md`「边界条件」一节。
+
 同一次启动里还顺带验证了：
 - 冷启动占位（M12 修订版）不黑屏，进程存活无异常
 - 三窗自动开启 attempt 1 成功
@@ -157,7 +159,58 @@ M12 改动了 manifest 与入口 Activity（启动路径），所以把**创新�
 
 这项检查在本次修复前会失败、修复后通过 —— 它防的是同类回归。
 
-## 6. 待真机验证清单（本轮新增/变更）
+## 6. 模拟器故障恢复手册（2026-11-09 实测踩坑，决赛前必读）
+
+模拟器被内存压力杀掉后重启，`--watch` **不会自动救回来** —— 它会拒绝启动，理由是"检测到另一个实例"。这个坑在决赛投屏时就是事故。
+
+### 症状与日志
+
+```
+Entering emulator watch mode. If the process exits or adb goes offline, the CLI will try to restart it automatically.
+Detected an abnormal emulator process or adb state. Preparing to restart the emulator.
+Detected emulator exit or offline adb; restart attempted.
+ADB command timed out after 30s: adb devices -l
+Detected an abnormal emulator process or adb state. Preparing to restart the emulator.
+Error: Unable to stop abnormal emulator Pico_Emulator_6_1 before restart; refusing to launch a second instance.
+```
+
+同时 `adb devices` 里设备显示 **offline**，或干脆列不出设备。
+
+### 根因
+
+qemu 进程还活着（占 ~1 GB 内存）但 adb 状态已断 —— **僵尸实例**。`--watch` 检测到"已有实例"就拒绝拉起第二个。
+
+### 处置（实测有效）
+
+```bash
+# 1. 找出僵尸进程（emulator.exe + qemu-system-x86_64.exe）
+tasklist | grep -iE "emulator|qemu"
+
+# 2. 杀掉（Git Bash 里 /PID 会被转成路径，用双斜杠）
+taskkill //PID <qemu-pid> //F
+taskkill //PID <emulator-pid> //F
+
+# 3. 重启
+pico-cli emulator start --avd Pico_Emulator_6_1 --watch
+```
+
+### 两个实测细节
+
+| 细节 | 说明 |
+|---|---|
+| **Git Bash 的 `taskkill /PID` 会被解析成路径** | `taskkill /PID 123` → `Invalid argument/option - 'C:/Program Files/Git/PID'`。用 `//PID` 或 `cmd //c taskkill /PID ...` |
+| **模拟器端口不固定** | 同一台机器上出现过 5554 与 5556。**脚本里不要硬编码 `emulator-5556`**，用 `adb devices` 动态取，或 `adb -s $(adb devices \| awk 'NR==2{print $1}')` |
+
+### 恢复后必须重跑的两件事
+
+模拟器实例重建会丢系统级锚点（见 `docs/ANCHOR-M2-TEST.md` 边界条件），所以：
+
+1. **重新放卡**：丢卡前跑 `am broadcast -a com.memorypalace.anchor.PLACE --ef x 0.0 --ef y 1.2 --ef z -1.5 --es front "..." --es back "..."`
+2. **重验 drift**：重启后看 logcat 的 `verifyRestored: ... drift=0.0m`
+
+**这正是决赛现场的操作顺序** —— 模拟器挂了重启之后，评委不会给你时间重放三分钟视频。演练时必须把这个恢复流程跑一遍。
+
+## 7. 待真机验证清单（本轮新增/变更）
 
 | 项 | 原因 |
 |---|---|
@@ -166,3 +219,4 @@ M12 改动了 manifest 与入口 Activity（启动路径），所以把**创新�
 | 通知弹窗在头显内的呈现 | 模拟器无系统通知面板 |
 | 冷启动耗时（真机 arm64 原生应显著快于模拟器 12s） | 模拟器走 x86 转译 |
 | 三窗拖动缩放 | 模拟器官方明示无法驱动 3D 空间按钮（HC-1） |
+| **锚点在设备重启后的存续** | 模拟器实例重建必丢；真机是否持久未验（见 ANCHOR-M2-TEST 边界条件） |
