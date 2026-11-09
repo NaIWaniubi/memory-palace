@@ -5,7 +5,9 @@
 
 ![三窗架构：书房看板 + 随身复习卡 + 房间层](media/screenshots/demo_s1_coldstart_3win.jpg)
 
-*上图为 PICO Emulator 6.1 实时录制（模拟器画面，非真机）。*
+*上图为 PICO Emulator 6.1 实时截屏（模拟器画面，非真机）。*
+
+**演示视频**：[media/demo-video.mp4](media/demo-video.mp4) —— 146 秒，12 幕 + 片头片尾。全部画面来自 PICO Emulator 实时截屏，右上角常驻「模拟器录制」角标，不伪造真机画面。
 
 ## 30 秒电梯陈述
 
