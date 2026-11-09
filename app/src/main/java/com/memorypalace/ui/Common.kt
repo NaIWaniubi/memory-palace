@@ -108,7 +108,7 @@ fun Lifecycle.Event.readable(): String = name
 @Composable
 fun Modifier.mpPanel(): Modifier = this
     .clip(RoundedCornerShape(MpShape.Block))
-    .background(MpColors.SurfaceDark.copy(alpha = 0.94f))
+    .background(MpColors.SurfaceDark.copy(alpha = 0.97f))
     .padding(MpSpace.PanelMain)
 
 /**
