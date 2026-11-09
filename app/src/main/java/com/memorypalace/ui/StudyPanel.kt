@@ -41,15 +41,18 @@ fun StudyPanel() {
     LifecycleLogger("study_panel", instanceId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // 演示模式：关掉后探针（实例号/计数器/事件日志/无头提示）全回来，供实测取证
+    val demo by DemoMode.enabled.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(MpSpace.PanelMain),
         verticalArrangement = Arrangement.spacedBy(MpSpace.Xl),
     ) {
         MpText("记忆宫殿 · 书房面板", fontSize = MpType.Display, fontWeight = MpType.Bold)
-        MpText("实例号 #$instanceId（切换双态后变化=窗口被销毁重建）", fontSize = MpType.BodyLarge, color = MpColors.Accent)
-
-        StateCounter("study_panel", instanceId)
+        if (!demo) {
+            MpText("实例号 #$instanceId（切换双态后变化=窗口被销毁重建）", fontSize = MpType.BodyLarge, color = MpColors.Accent)
+            StateCounter("study_panel", instanceId)
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
             Button(onClick = { DualStateController.requestOpenStage(context) }) {
@@ -68,11 +71,13 @@ fun StudyPanel() {
             }
         }
 
-        MpText(
-            "导入（M5/M8）：支持 CSV / 纯文本 / Anki .apkg，离线解析。真机走「导入牌组」选文件 → 此处出字段映射确认页；无头直导：card.IMPORT --es path …",
-            fontSize = MpType.Caption,
-            color = MpColors.TextSecondary,
-        )
+        if (!demo) {
+            MpText(
+                "导入（M5/M8）：支持 CSV / 纯文本 / Anki .apkg，离线解析。真机走「导入牌组」选文件 → 此处出字段映射确认页；无头直导：card.IMPORT --es path …",
+                fontSize = MpType.Caption,
+                color = MpColors.TextSecondary,
+            )
+        }
 
         // M14：到期提醒。头显本地通知，不依赖手机 App、不依赖网络。
         Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
@@ -86,18 +91,19 @@ fun StudyPanel() {
                 MpText("撤提醒", fontSize = MpType.BodySmall)
             }
         }
-        MpText(
-            "到期提醒（M14）：头显本地通知，遗忘曲线算出到期时刻后在头显里弹横幅。" +
-                "一次响一整批，不逐张打扰；全部逾期时立刻提醒一次。" +
-                "无头：am broadcast -a com.memorypalace.notify.SCHEDULE / TEST / CANCEL",
-            fontSize = MpType.Caption,
-            color = MpColors.TextSecondary,
-        )
+        if (!demo) {
+            MpText(
+                "到期提醒（M14）：头显本地通知，遗忘曲线算出到期时刻后在头显里弹横幅。" +
+                    "一次响一整批，不逐张打扰；全部逾期时立刻提醒一次。" +
+                    "无头：am broadcast -a com.memorypalace.notify.SCHEDULE / TEST / CANCEL",
+                fontSize = MpType.Caption,
+                color = MpColors.TextSecondary,
+            )
+        }
         // 精确闹钟权限：没有它系统会把提醒延后几十分钟，必须让用户看见并去开
         if (!DueReminder.canScheduleExact(context)) {
             MpText(
-                "⚠ 精确闹钟权限未开启，提醒会被系统延后。" +
-                    "请到系统设置 → 应用 → 记忆宫殿 → 闹钟和提醒 → 允许",
+                "⚠ 提醒权限未开启，通知会被系统延后。请到 系统设置 → 应用 → 记忆宫殿 → 闹钟和提醒，允许通知",
                 fontSize = MpType.Caption,
                 color = MpColors.Warning,
             )
@@ -105,17 +111,20 @@ fun StudyPanel() {
 
         ImportConfirmView()
 
-        MpText(
-            "无头驱动（模拟器点不了空间按钮时用）：adb shell am broadcast -a com.memorypalace.dualstate.OPEN_STAGE / CLOSE_STAGE / TOGGLE_REVIEW_CARD",
-            fontSize = MpType.Caption,
-            color = MpColors.TextSecondary,
-        )
-
         TimeMachineView()
 
         DueQueueView()
 
-        EventLogView(maxLines = 7)
+        if (!demo) {
+            MpText(
+                "无头驱动（模拟器点不了空间按钮时用）：adb shell am broadcast -a com.memorypalace.dualstate.OPEN_STAGE / CLOSE_STAGE / TOGGLE_REVIEW_CARD",
+                fontSize = MpType.Caption,
+                color = MpColors.TextSecondary,
+            )
+            EventLogView(maxLines = 7)
+        }
+
+        DemoModeToggle()
         Spacer(Modifier.height(MpSpace.Xs))
     }
 }
@@ -125,6 +134,7 @@ fun StudyPanel() {
 fun TimeMachineView() {
     val tick by Clock.tick.collectAsState()
     val offset = remember(tick) { Clock.offsetDays() }
+    val demo by DemoMode.enabled.collectAsState()
     // M12：跳转瞬间先亮"在处理"态 —— 房间层 GL 纹理重建有数秒延迟（M6 实测），
     // 没有这个提示的话，按完按钮房间层数秒没反应，现场观感="卡死了"。4.5s 后自动收起。
     var jumping by remember { mutableStateOf(false) }
@@ -161,11 +171,13 @@ fun TimeMachineView() {
                 color = MpColors.TimeMachine,
             )
         }
-        MpText(
-            "快进到未来：到期队列立即重算堆积，房间层锚定卡片按记忆强度褪色。无头：am broadcast -a com.memorypalace.clock.SET_OFFSET --el days 7",
-            fontSize = MpType.Caption,
-            color = MpColors.TextSecondary,
-        )
+        if (!demo) {
+            MpText(
+                "快进到未来：到期队列立即重算堆积，房间层锚定卡片按记忆强度褪色。无头：am broadcast -a com.memorypalace.clock.SET_OFFSET --el days 7",
+                fontSize = MpType.Caption,
+                color = MpColors.TextSecondary,
+            )
+        }
     }
 }
 
@@ -177,6 +189,7 @@ fun DueQueueView() {
     val due = remember(cards, tick) { DataGraph.repository.dueQueue(cards) }
     val session by ReviewSession.state.collectAsState()
     val scope = rememberCoroutineScope()
+    val demo by DemoMode.enabled.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(MpSpace.Sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
@@ -232,12 +245,20 @@ fun DueQueueView() {
             }
         }
         if (cards.isEmpty()) {
-            MpText(
-                "加卡：am broadcast -a com.memorypalace.card.ADD --es front \"serendipity\" --es back \"n.意外之喜\"；" +
-                    "复习：…card.REVIEW --es id <前缀> --es grade remember|forgot",
-                fontSize = MpType.Caption2,
-                color = MpColors.TextSecondary,
-            )
+            if (!demo) {
+                MpText(
+                    "加卡：am broadcast -a com.memorypalace.card.ADD --es front \"serendipity\" --es back \"n.意外之喜\"；" +
+                        "复习：…card.REVIEW --es id <前缀> --es grade remember|forgot",
+                    fontSize = MpType.Caption2,
+                    color = MpColors.TextSecondary,
+                )
+            } else {
+                MpText(
+                    "还没有卡片。点「导入牌组」导入 CSV / 纯文本 / Anki apkg，或先从示例牌组开始。",
+                    fontSize = MpType.Caption,
+                    color = MpColors.TextSecondary,
+                )
+            }
         }
     }
 }

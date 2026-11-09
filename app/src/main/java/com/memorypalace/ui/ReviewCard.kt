@@ -29,6 +29,7 @@ fun ReviewCard() {
     LifecycleLogger("review_card", instanceId)
 
     val session by ReviewSession.state.collectAsState()
+    val demo by DemoMode.enabled.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(MpSpace.PanelCard),
@@ -42,11 +43,13 @@ fun ReviewCard() {
             Button(onClick = { ReviewSession.start() }) {
                 MpText("开始复习（取今日到期队列）", fontSize = MpType.Body)
             }
-            MpText(
-                "广播：review.START / REVEAL / GRADE --es grade remember|forgot / EXIT",
-                fontSize = MpType.Caption2,
-                color = MpColors.TextSecondary,
-            )
+            if (!demo) {
+                MpText(
+                    "广播：review.START / REVEAL / GRADE --es grade remember|forgot / EXIT",
+                    fontSize = MpType.Caption2,
+                    color = MpColors.TextSecondary,
+                )
+            }
         } else {
             val card = s.current
             MpText(
@@ -58,11 +61,13 @@ fun ReviewCard() {
                 MpText(card.front, fontSize = MpType.Display, fontWeight = MpType.Bold)
                 if (s.revealed) {
                     MpText(card.back, fontSize = MpType.CardFront, color = MpColors.Accent)
-                    MpText(
-                        "reps=${card.repetitions} ef=${"%.2f".format(card.easiness)} 间隔=${card.intervalDays}d",
-                        fontSize = MpType.Caption,
-                        color = MpColors.TextSecondary,
-                    )
+                    if (!demo) {
+                        MpText(
+                            "reps=${card.repetitions} ef=${"%.2f".format(card.easiness)} 间隔=${card.intervalDays}d",
+                            fontSize = MpType.Caption,
+                            color = MpColors.TextSecondary,
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
                         Button(onClick = { ReviewSession.grade(Grade.REMEMBERED) }) {
                             MpText("记得", fontSize = MpType.BodyLarge)
@@ -83,6 +88,8 @@ fun ReviewCard() {
             }
         }
 
-        EventLogView(maxLines = 5)
+        if (!demo) {
+            EventLogView(maxLines = 5)
+        }
     }
 }

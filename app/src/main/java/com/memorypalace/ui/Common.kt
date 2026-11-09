@@ -96,3 +96,23 @@ fun StateCounter(component: String, instanceId: Int) {
 }
 
 fun Lifecycle.Event.readable(): String = name
+
+/**
+ * 演示模式开关（M15）。演示模式开 = 干净的产品界面；关 = 探针全回来。
+ *
+ * 放在面板最底部、字号最小 —— 演示时它不占视觉重量，需要取证时点一下就有。
+ * 关掉演示模式后双态探针仍会写 logcat，所以实测证据链不受影响。
+ */
+@Composable
+fun DemoModeToggle() {
+    val demo by DemoMode.enabled.collectAsState()
+    Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Sm)) {
+        com.pico.spatial.ui.design.Button(onClick = { DemoMode.toggle() }) {
+            MpText(
+                if (demo) "显示调试信息" else "隐藏调试信息",
+                fontSize = MpType.Caption2,
+                color = MpColors.TextSecondary,
+            )
+        }
+    }
+}
