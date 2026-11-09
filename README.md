@@ -21,6 +21,10 @@
 >
 > 一次进入房间层识别出 **57 个平面**，带家具级语义（地板 / 天花板 / 墙 / 门 / 窗 / 桌面 / 柜子 / 椅子 / 床 / 窗帘）。注入射线打到「桌面」，落点 `(-4.2471, 1.104, -3.3652)`，建出的真实世界锚点落在 `y = 1.124`（命中点 + 2 cm 抬升），持久层记 `label=桌面`，卡片显示「📍 钉在桌面上」。
 >
+> 证据截图（模拟器实时截屏，**非渲染图**）：
+>
+> ![房间平面列表与瞄准](media/screenshots/m16-planes-aim.jpg)
+>
 > 还不诚实的部分写在功能矩阵里：**模拟器没有手柄**（`ControllerTrackingProvider` 返回 `DEVICE_NOT_SUPPORTED`），所以"扣扳机"这一步只能在真机验证；被验证的是除"位姿从哪来"之外的全部链路（几何判定 → 准星 → 落点 → 建锚 → 持久化）。
 
 [![CI](https://github.com/NaIWaniubi/memory-palace/actions/workflows/ci.yml/badge.svg)](https://github.com/NaIWaniubi/memory-palace/actions/workflows/ci.yml)
