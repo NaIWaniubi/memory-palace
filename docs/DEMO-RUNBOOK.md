@@ -26,7 +26,7 @@ pico-cli emulator start --avd Pico_Emulator_6_1 --watch
 恢复后**必须重做两件事**（模拟器重启会丢系统锚点）：
 
 1. 重新放卡：`adb shell am broadcast -a com.memorypalace.anchor.PLACE --ef x 0.0 --ef y 1.2 --ef z -1.5 --es front "..." --es back "..."`
-2. 重验位置：logcat 里应出现 `verifyRestored: ... drift=0.0m`
+2. 重验位置：logcat 里应出现 `verifyRestored: uuid=... saved=(...) resolved=(...)`（**不要用 drift 数值当精度证据** —— 模拟器回显请求位姿，相等是恒等式）
 
 **时间预算（实测）**：从模拟器挂掉到能演示约 **3 分钟**（重启 90s + 应用冷启 50s + 放卡 10s）。**超 60 秒就切兜底视频**。
 

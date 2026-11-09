@@ -39,7 +39,8 @@ SCENES=(
 "v09_faded_room|到期卡片肉眼可见地褪色|14"
 "v10_reset|复习把它们找回来|10"
 "v11_import_confirm|导入 Anki apkg：字段映射确认页|12"
-"v12_after_confirm|确认入库，队列立即变化|12"
+"v13_spatial_audio|空间音频：提示音从卡片所在位置发出|11"
+"v14_notification|到期提醒：一次响一整批，不逐张打扰|10"
 )
 
 # 校验素材
