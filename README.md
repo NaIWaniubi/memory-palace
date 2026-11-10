@@ -93,7 +93,7 @@ pico-cli app launch                               # 3. 启动应用
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**关键约束**：`core/` 模块不 import 任何 PICO SDK，也不 import `android.*` —— 调度算法与导入管线是纯 JVM，可离线单测，CI 里跑（42 例）。这条约束由 CI 静态检查强制（`.github/workflows/ci.yml`）。
+**关键约束**：`core/` 模块不 import 任何 PICO SDK，也不 import `android.*` —— 调度算法与导入管线是纯 JVM，可离线单测，CI 里跑（68 例）。这条约束由 CI 静态检查强制（`.github/workflows/ci.yml`）。
 
 ### 目录
 
@@ -190,7 +190,7 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 
 `.git` 目录约 **176 MB** —— 原始 PNG 和早期截图留在历史里，没改写历史，因为「全新项目无旧代码搬运」的声明靠连续可查的 commit 时间戳支撑。克隆约 70 秒，可接受。
 
-### core 单测：42 例全绿
+### core 单测：68 例全绿
 
 | 测试文件 | 用例数 | 状态 |
 |---|---|---|
@@ -208,7 +208,7 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 | 步骤 | 结果 |
 |---|---|
 | `git clone` | ✅ 成功，约 70 秒（含 44MB 视频） |
-| `:core:test` | ✅ BUILD SUCCESSFUL，42 例全绿 |
+| `:core:test` | ✅ BUILD SUCCESSFUL，68 例全绿 |
 | `:app:assembleDebug` | ✅ BUILD SUCCESSFUL，产出 **30 MB** debug APK |
 
 ### CI 现状
@@ -237,13 +237,13 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 
 ### 一句话小结
 
-**评委 clone 下来约 70 秒、`./gradlew :core:test` 一条命令看到 42 例 core 单测全绿；装上模拟器能跑通三窗 + 锚定 + 复习 + 到期提醒的完整闭环。还没验的是 12 项必须靠真机的东西**（空间交互、手势、声场方位、通知弹窗呈现、锚点跨重启存续、SAF 呈现等，完整清单见 [DUAL-STATE-VERIFICATION](docs/DUAL-STATE-VERIFICATION.md) §6）。
+**评委 clone 下来约 70 秒、`./gradlew :core:test` 一条命令看到 68 例 core 单测全绿；装上模拟器能跑通三窗 + 锚定 + 复习 + 到期提醒的完整闭环。还没验的是 12 项必须靠真机的东西**（空间交互、手势、声场方位、通知弹窗呈现、锚点跨重启存续、SAF 呈现等，完整清单见 [DUAL-STATE-VERIFICATION](docs/DUAL-STATE-VERIFICATION.md) §6）。
 
 ## 路线图
 
 - **2026-11-07**：仓库初始化；M1 三窗空壳（双态生命周期实测封板）
 - **2026-11-07**：M2–M8 集中落地 —— 锚定闭环、数据层、复习流、导入管线、时间机器、预置牌组、导入确认页
-- **2026-11-09**：M12 冷启动占位页；M13 空间音频方位引导 + 记忆强度下沉 core（42 例单测全绿）；M14 头显本地到期提醒
+- **2026-11-09**：M12 冷启动占位页；M13 空间音频方位引导 + 记忆强度下沉 core（68 例单测全绿）；M14 头显本地到期提醒
 - ~~11/10–11/13：竞品调研 + 文档定稿~~ → **已提前完成（11/09）**：25 款竞品取证、ALGORITHM / DESIGN / SCORING / COMPETITORS 定稿
 - **11/14–11/22**：真机借测窗口（空间交互唯一验证手段）；锚定最小闭环复测
 - **11/23–11/29**：复习流打磨；11/25 提交 v0.1 占位；11/28 起每日真实使用记录

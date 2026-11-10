@@ -21,6 +21,7 @@
 | 2026-11-07 | M11 三分钟演示路径固化（冷启动自动开三窗 / 锚卡「复习这张」/ 面板「钉入房间」） | [docs/DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) |
 | 2026-11-09 | M12 冷启动占位（**修订版**：LAUNCHER 保持 Spatial stub，改用窗口背景占位；原 SplashActivity 方案因触发 SDK 容器冲突已删除）+ 时间跳转处理中提示 | `app/.../app/LaunchActivity.kt`、`res/values/themes.xml`（`Theme.MpSplash`） |
 | 2026-11-09 | M13 空间音频方位引导 + 记忆强度计算下沉 core（单测 16→42 例） | `app/.../audio/SpatialCue.kt`、`core/.../schedule/MemoryStrength.kt` |
+| 2026-11-10 | M16 平面检测 + 家具语义 + 射线取点（单测 42→68 例），模拟器实测 57 个平面 | `app/.../spatial/*.kt`、`core/.../spatial/Geometry.kt` |
 | 2026-11-09 | 文档三件套定稿（ALGORITHM / DESIGN / SCORING）+ README 同步到 M13 现状 + CI 真实化 | `docs/`、`.github/workflows/ci.yml` |
 | 2026-11-09 | M14 头显本地到期提醒（通知通道 + 精确闹钟 + 复习后撤销） | `app/.../notify/DueNotifier.kt`、`DueReminder.kt` |
 | 2026-11-09 | **M12–M14 模拟器实跑验证**：抓出并修掉两个真实 bug（M12 启动即崩 / 提醒排到过去时刻）；空间音频三音、到期通知、提醒调度触发撤销全部实测通过 | [docs/M12-M14-TEST.md](M12-M14-TEST.md) |
@@ -44,7 +45,7 @@
 | 项 | 结果 |
 |---|---|
 | `git clone` | ✅ 成功，**约 70 秒**（含 44MB 演示视频；此前因 165MB 截图直接失败过） |
-| `:core:test` | ✅ BUILD SUCCESSFUL，42 例全绿 |
+| `:core:test` | ✅ BUILD SUCCESSFUL，68 例全绿 |
 | `:app:assembleDebug` | ✅ BUILD SUCCESSFUL，产出 30 MB debug APK |
 | 版本库跟踪体积 | 59.5 MB（演示视频 44MB + 截图 14MB + 源码与文档 1.5MB） |
 
@@ -59,7 +60,7 @@
 | core 单测（Scheduler） | 12 例 | ✅ 全绿 |
 | core 单测（MemoryStrength） | 19 例 | ✅ 全绿 |
 | core 单测（Importers） | 11 例 | ✅ 全绿 |
-| **合计** | **42 例** | ✅ 全绿 |
+| **合计** | **68 例** | ✅ 全绿 |
 
 CI：`.github/workflows/ci.yml` 在 GitHub Actions 跑 core 全量单测 + **四项**静态检查（core 零框架依赖、manifest 有 LAUNCHER 入口、stage meta-data 必须挂在 LAUNCHER activity 上、广播 action 唯一）。
 
