@@ -7,7 +7,7 @@
 
 *上图为 PICO Emulator 6.1 实时截屏（模拟器画面，非真机）。*
 
-**演示视频**：[media/demo-video.mp4](media/demo-video.mp4) —— 155 秒，13 幕 + 片头片尾。全部画面来自 PICO Emulator 实时截屏（演示模式，无调试信息），右上角常驻「模拟器录制」角标，不伪造真机画面。**没有音轨** —— 分镜里的旁白是给真人念的，不是视频配音，这一条如实标注。
+**演示视频**：[media/demo-video.mp4](media/demo-video.mp4) —— 165 秒，14 幕 + 片头片尾。全部画面来自 PICO Emulator 实时截屏（演示模式，无调试信息），右上角常驻「模拟器录制」角标，不伪造真机画面。**没有音轨** —— 分镜里的旁白是给真人念的，不是视频配音，这一条如实标注。
 
 ## 30 秒电梯陈述
 
@@ -174,7 +174,7 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 | [docs/DUAL-STATE-TEST.md](docs/DUAL-STATE-TEST.md) | 双态切换与窗口生命周期实测结论（原始记录） |
 | [docs/ANCHOR-M2-TEST.md](docs/ANCHOR-M2-TEST.md) | 锚定闭环实测（含恢复漂移数据） |
 | [docs/M4–M8-*-TEST.md](docs/) | 复习流 / 导入管线 / 时间机器 / 预置牌组 / 确认页 实测记录 |
-| [docs/VIDEO-STORYBOARD.md](docs/VIDEO-STORYBOARD.md) | 演示视频分镜（**旧版规划稿** 150s 五幕 19 镜；成片是 155s 13 幕，见上） |
+| [docs/VIDEO-STORYBOARD.md](docs/VIDEO-STORYBOARD.md) | 演示视频分镜（**旧版规划稿** 150s 五幕 19 镜；成片是 165s 14 幕，见上） |
 | [docs/ITERATION.md](docs/ITERATION.md) | 迭代记录：全新项目声明与里程碑日志 |
 
 ## 完成度证据
