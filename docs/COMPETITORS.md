@@ -554,7 +554,7 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 2. 应用商店要**全库检索**（API 直查），不是看搜索页 —— 搜索页本身就是摘要的产物
 3. 每一项"不可达"都要有**对照组**证明不是通道坏了：`example.com` 能 RDAP 200、`ankiweb.net` 能 CDX 返 3 条，才能说 `anki3d.com` 的 404 与 0 条是真结论
 
-**仍未闭合的缺口**（见 `docs/COMPETITOR-ANKI3D.md` §5）：PICO Store 全库检索 API 在本网络环境下整体不可用（对照组词同样 internal error，**不能据此断定无此类应用**）；Meta Store 原生搜索未完成（结论依赖 5thScape 镜像）；SpatialFlashcards / LOCI 的真机态未验证（持久化、是否真用系统锚点、空间音频三项）；两个 Reddit 关键讨论帖正文 403 未取到。
+**仍未闭合的缺口**（见 `docs/COMPETITOR-ANKI3D.md` §5）：PICO Store 官方检索 API 在本网络下仍整体故障（2026-11-13 复测：对照组词 `tetris`/`game`/`puzzle` 同样 internal error；已改用对照词验证可用的 SideQuest 索引检索 34 词，PICO 侧未见同类 —— 但该索引无法全量枚举，故仍不能宣称「穷尽」）；Meta Store 原生搜索未完成（结论依赖 5thScape 镜像）；SpatialFlashcards / LOCI 的真机态未验证（持久化、是否真用系统锚点、空间音频三项）；两个 Reddit 关键讨论帖正文 403 未取到。
 
 ---
 
@@ -601,8 +601,116 @@ Memrise spaced repetition / Duolingo / Quizlet / mnemocards / wordful dictionary
 1. **搜索工具可靠性**：本次调研中，内置 WebSearch 工具多次返回**不可访问或不存在的 URL**（如 `supermemo.com/en/blog/sm-2`、`ikea-place-app` 服务页、`arlopa-ar-platform` 体验页、`ar-lens.com`）。**所有进入本文件的链接均经 `curl` 状态码校验**，检索工具给出的错误链接已全部在「已排除候选」中记录并替换为实际可访问的等价取证源。
 2. **商店反爬限制**：Meta Store 深链裸 curl 返回 400，PICO 全球商店站返回 000。这两处依赖 WebFetch 渲染 + 5thscape / SideQuest 第三方元数据镜像（元数据来源由该站明示为 Meta Store）。**5thscape 转述的价格、评分、发行日未经原始商店页二次确认**，本文在引用时已注明出处。
 3. **平台覆盖缺口**：Horizon Worlds 教育内容、iOS App Store 竞品（iTunes API 在本次会话中不可达）、Rec Room 教育空间、VRChat 内部世界**未能取得一手取证**，其中仅 VRChat 通过官方 Wiki 取得了间接证据。这几处**可能存在未被发现的同类产品**，自评时应保留此余量。
-4. **PICO 官方商店仍未覆盖（2026-11-09 复测）**：`store-global.pico-store.com` 连接失败（curl 000）；`appstore-cn.picoxr.com/api/app/v1/search` 对**所有关键词**返回 `{"code":10000,"msg":"internal error"}` —— 包括必然有结果的对照词 `tetris` / `game` / `Anki`，故属 **API 在本网络环境整体不可用**，**不能据此断定无此类应用**。这是当前唯一未闭合的平台缺口，11/13 前需换网络环境或人工浏览商店 Web 端补查。
-4. **信息时效**：检索日期为 **2026-11-09**。商店上架状态、版本、评分随时变动，正式提交前建议对 Meta Store 与 PICO Store 的 3 款 XR 竞品（LOCI、SpatialFlashcards、ThingLink XR）再做一次复核。
+4. **PICO 官方商店：2026-11-13 已复查，结论更新（原「未覆盖」→「已用替代索引检索，PICO 侧无同类」）**
+   官方检索 API 仍整体故障：`appstore-cn.picoxr.com` 与 `appstore-global.picoxr.com` 的
+   `/api/app/v1/search` 对**必然有结果的对照词** `tetris` / `game` / `puzzle` 一律返回
+   `{"code":10000,"msg":"internal error"}` —— 横跨两个域名、curl 与浏览器内两种发起方式、
+   带与不带完整浏览器头均如此；商店 Web 端（`store.picoxr.com` cn/global）渲染后正文只有
+   「页面加载失败」。**该 API 在本网络下仍不可用，属于服务端故障，不能据此断定无此类应用。**
+   因此改用**对照词已验证可用的替代索引**（SideQuest 官方后端 API，对照词 `tetris`/`game`/`puzzle`
+   均有命中）做 34 个中英文关键词检索：
+   - 名称真正相关的只有 4 条（3 款：Shores of Loci、Mind Palace ×2、SpatialFlashcards），
+     **全部 `supports_pico = False`** —— 都是 Quest 应用，**PICO 侧没有**
+   - `supports_pico = true` 的命中 9 条（6 款）全部是游戏 / 测试包 / 美术馆漫游 / MR 打靶，
+     **无一条是教育、闪卡或记忆类**
+   - 该索引分页与排序参数均失效（任何 `page`/`sort_by` 都返回同一批 100 条），无法全量枚举，
+     故以关键词检索为主路径；这是本复查的**覆盖边界**
+   原始请求与响应见 `docs/evidence/2026-11-13-pico-store-recheck.md`。
+   **口径**：可以说「用可用的替代索引检索过，PICO 侧未见同类」，
+   **不能说**「PICO 商店全库已穷尽、绝无同类」。
+5. **信息时效**：检索日期为 **2026-11-09**（PICO 商店复查 2026-11-13）。商店上架状态、版本、评分随时变动，正式提交前建议对 Meta Store 与 PICO Store 的 3 款 XR 竞品（LOCI、SpatialFlashcards、ThingLink XR）再做一次复核。
 
 
 
+
+---
+
+## 附二：2026-11-13 PICO 商店复查
+
+> 触发原因：11/09 那次把「PICO 商店」列为本调研**唯一未闭合的平台缺口**，
+> 当时判定依据是「查询 API 对所有关键词返回 internal error，包括必然有结果的对照词」，
+> 所以只能写「不可核验」而不是「不存在」。11/13 按计划复查。
+
+### 一、官方检索 API：仍然故障（不是「查无」）
+
+| 入口 | 对照词 `tetris` / `game` / `puzzle` 的实际响应 |
+|---|---|
+| `appstore-cn.picoxr.com/api/app/v1/search`（POST） | 全部 `{"code":10000,"msg":"internal error","data":{}}` |
+| `appstore-global.picoxr.com/api/app/v1/search`（POST） | 全部同上 |
+| `store.picoxr.com/{cn,global}/search?keyword=anki`（Web） | HTTP 200，但渲染后正文只有「页面加载失败」 |
+| `store-global.pico-store.com` | curl 000，连接失败 |
+
+排除了三种「我们这边请求有问题」的可能之后仍然如此：
+① 补全 `Origin` / `Referer` / `User-Agent` / `Accept` 头；
+② 在**真实渲染的浏览器页面内**用同源 `fetch` 发起（完整浏览器上下文）；
+③ 换用 `appstore-global` 域名（该域名确实存在且 200）。
+
+**判定：官方 API 侧整体故障，本次未能取得 PICO 商店的一手检索结果。**
+`internal error` 出现在必然有结果的对照词上，因此这个响应**不构成**「PICO 商店没有同类应用」的证据。
+
+### 二、替代索引：SideQuest 官方后端（对照词已验证可用）
+
+既然官方入口拿不到，改用第三方索引。**先证明索引本身是好的**，再谈命中：
+
+| 对照词 | SideQuest 命中 |
+|---|---|
+| `tetris` | 3 条（首条 Vetrix） |
+| `puzzle` | 3 条（首条 Puzzle Tropicana） |
+| `game` | 3 条（首条 Treehouse Games…） |
+
+对照组全部有命中 → 该索引在本次网络下**可用**。
+
+检索 34 个中英文关键词（`flashcard` / `flash card` / `flashcards` / `anki` /
+`spaced repetition` / `memory palace` / `loci method` / `mnemonic` / `vocabulary` /
+`word card` / `study card` / `quiz` / `revision` / `study` / `learn` / `education` /
+`card game` / `cards` / `memorize` / `memory` / `recall` / `brain` / `闪卡` / `记忆卡片` /
+`记忆宫殿` / `记忆术` / `间隔重复` / `背诵` / `单词卡` / `学习卡` / `教育` / `学习` / `记忆` / `复习`）。
+
+**名称真正相关的 4 条（3 款）：**
+
+| 产品 | 下载 | `supports_pico` | 与本文的关系 |
+|---|---|---|---|
+| Shores of Loci | 1,196 | **False** | 叙事解谜**游戏**，名字含 Loci 但语义无关（前文已判为非竞品） |
+| Mind Palace | 254 | **False** | 「organizing thoughts in a 3D space」——3D 白板类，无闪卡 / 无 SRS / 无家具锚定 |
+| Mind Palace（重复上架） | 166 | **False** | 同上 |
+| SpatialFlashcards | 87 | **False** | VR 闪卡应用（本文已列为高相似度先例） |
+
+**关键：这 4 条全部 `supports_pico = False` —— 都是 Quest 应用，PICO 侧没有。**
+
+**`supports_pico = true` 的命中（9 条 / 6 款）** 全部与记忆无关：
+Tower Of Hanoi（汉诺塔游戏）、Escape Room: Bank Robbery Gone Wrong（密室逃脱）、
+Colorway Antics Demo（涂色）、testgame ×3（开发者测试包，简介只写了「lol」）、
+艺术馆VR（美术馆漫游）、Go Go Fight（多人对抗）、MR Target Practice Simulator Demo（MR 打靶）。
+**无一条是教育、闪卡或记忆类。**
+
+### 三、结论（措辞经过校准）
+
+**可以这么说：**
+> 「我们用一个对照词已验证可用的第三方索引（SideQuest 官方后端）检索了 34 个中英文关键词，
+> **在 PICO 侧没有发现任何闪卡 / 间隔重复 / 记忆宫殿类应用**。同类的 4 条命中全部是 Quest 应用，
+> 其中唯一真做闪卡的 SpatialFlashcards 下载量 87。」
+
+**不能这么说：**
+> ~~「PICO 商店里没有同类产品」~~ —— 官方 API 全程故障，我们没拿到一手全库结果；
+> 替代索引的分页与排序参数均失效（任何 `page` / `sort_by` 都返回同一批 100 条），
+> **无法全量枚举**，所以这是「检索过、未见」，不是「穷尽证明」。
+
+### 四、对自评的影响
+
+- **不调整**创新能力分（仍是 18–21）。原判「存在 2 款高相似度先例（Loci Devpost 原型、LOCI Quest 应用）」
+  的依据是一手取证，与本次复查无关；本次复查是**补充**「PICO 侧无同类」这一条，
+  不改变「XR 领域存在先例」的事实。
+- `docs/SCORING.md` 里「11/13 补查 PICO 商店发现同类 → 创新降至 16–18」这一条触发条件
+  **未发生**，该预案不启用。
+- 路演可增加一句（有证据支撑）：「在 PICO 生态里我们没有找到同类产品；
+  真正接近的两款都在 Quest 上（SpatialFlashcards 87 下载、Mind Palace 254 下载）。」
+
+### 五、本次复查的边界
+
+1. 官方 API 故障 → 一手全库结果**未取得**。
+2. 替代索引**无法分页**，只能关键词检索 → 关键词网之外的冷门应用可能漏检。
+3. SideQuest 的 `supports_pico` 字段是否覆盖 PICO 商店**全部**上架应用，未经官方确认 ——
+   它记录的是「该应用在 PICO 设备上可运行」，不等于「已在 PICO 商店上架」。
+   这一点是本次结论最大的不确定性来源，故结论措辞取保守侧。
+
+原始请求与逐条响应见 `docs/evidence/2026-11-13-pico-store-recheck.md`。
