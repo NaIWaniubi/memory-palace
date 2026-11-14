@@ -22,9 +22,11 @@
 #            Flow 重发；加固后分块单事务）。观测量 = 导入窗口内 ANR + PSS 尖峰。
 #
 #   [观察项] P3#6 启动 ANR / openStage NotAllowed
-#          → 脚本每轮从头 force-stop + monkey 拉起冷启动，全程 grep logcat 的
-#            ANR / FATAL / NotAllowed。openStage NotAllowed 的重试逻辑在
-#            DualStateController（本次禁改文件），脚本只做取证、不掩盖其出现次数。
+#          → 脚本在窗口开始前 force-stop + 冷启动一次，随后**全程不重启**，
+#            以真正满足准入门槛「连续运行 30 分钟」的字面语义；仅在检测到进程
+#            死亡时重新拉起并计入 DEAD 样本（判负）。全程 grep logcat 的
+#            ANR / FATAL / NotAllowed 取证。openStage NotAllowed 的重试逻辑在
+#            DualStateController，脚本只做取证、不掩盖其出现次数。
 #
 # 判定阈值（均可用环境变量覆盖）：
 #   PSS 后段均值相对前段涨幅 < PSS_GROWTH_PCT%（默认 15），且非逐样本单调上升；
@@ -37,6 +39,13 @@
 #   SAMPLE_SEC=15 bash scripts/stability-30min.sh     # 采样更密
 #
 # 退出码：0=通过全部阈值；1=触发任一红线/趋势判据；2=前置条件不满足（无设备等，非"假跑"）。
+#
+# 注意：在 Git Bash / MSYS 下，以 `/` 开头的独立参数会被改写成本机 Windows 路径
+# （`/sdcard/x` → `C:/Program Files/Git/sdcard/x`），会让 adb shell mkdir 与 adb push
+# 静默失败、导入压力项退化（历史上就踩过）。这里显式关闭路径转换。
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
+
 set -uo pipefail   # 注意：不用 -e，采样里的 grep/awk 允许无匹配返回非零
 
 # ---------- 可调参数 ----------
@@ -46,6 +55,10 @@ DURATION_SEC="${DURATION_SEC:-1800}"   # 30 分钟
 SAMPLE_SEC="${SAMPLE_SEC:-20}"         # 采样间隔
 ACTION_SEC="${ACTION_SEC:-4}"          # 每轮压力动作间隔
 PSS_GROWTH_PCT="${PSS_GROWTH_PCT:-15}" # PSS 前后段相对涨幅红线
+NATV_GROWTH_PCT="${NATV_GROWTH_PCT:-15}" # 原生堆涨幅红线（P3#4 句柄泄漏主信号）
+# CONTINUOUS=1：全程不 force-stop、不重复冷启动，真正「连续运行」满 DURATION_SEC；
+# 压力动作照常注入。准入门槛原文是「连续运行 30 分钟」，正式取证用本模式。
+CONTINUOUS="${CONTINUOUS:-1}"
 FD_SLACK="${FD_SLACK:-24}"             # fd 允许净增（进出 Full Space 本身有瞬时抖动）
 THREAD_SLACK="${THREAD_SLACK:-16}"     # 线程允许净增
 MAX_FATAL="${MAX_FATAL:-0}"            # FATAL/ANR 允许次数
@@ -129,13 +142,29 @@ read_pss_kb() {
   [[ "${n:-}" =~ ^[0-9]+$ ]] && echo "$n" || echo "-1"
 }
 
-# fd 数：debuggable 应用优先 run-as，其次直接读 /proc（userdebug 镜像 shell 能读）；拿不到记 -1
+# fd 数：debuggable 应用优先 run-as，其次直接读 /proc（userdebug 镜像 shell 能读）。
+#
+# 关键教训：`ls /proc/pid/fd 2>/dev/null | wc -l` 在权限被拒时会把错误吞掉、
+# 对空输入返回 0，而 0 是合法整数 —— 于是「读不到」被当成「测到 0 个 fd」，
+# 后续「fd 末值 ≤ 首值 + slack」就无脑判 PASS（假通过）。因此这里：
+#   ① 先显式探测目录是否可列；② 只有 >0 才算有效值，0 一律记 -1（不可测）。
 read_fd_count() {
   local pid="$1" n
   n="$(adb shell "run-as $PKG sh -c 'ls /proc/$pid/fd | wc -l'" 2>/dev/null | tr -d '\r' | awk '{print $1}')"
-  if ! [[ "${n:-}" =~ ^[0-9]+$ ]]; then
-    n="$(adb shell "ls /proc/$pid/fd 2>/dev/null | wc -l" 2>/dev/null | tr -d '\r' | awk '{print $1}')"
+  if ! [[ "${n:-}" =~ ^[1-9][0-9]*$ ]]; then
+    n="$(adb shell "ls /proc/$pid/fd >/dev/null 2>&1 && ls /proc/$pid/fd 2>/dev/null | wc -l" 2>/dev/null \
+        | tr -d '\r' | awk 'NF && $1 ~ /^[0-9]+$/ {print $1; exit}')"
   fi
+  [[ "${n:-}" =~ ^[1-9][0-9]*$ ]] && echo "$n" || echo "-1"
+}
+
+# 原生堆（KB）：SpatialCue 泄漏的是原生音频句柄，release 包非可调试时读不到 fd，
+# 但 `dumpsys meminfo` 的 Native Heap 私有脏页无需任何权限即可取，且对原生句柄泄漏
+# 比 fd 计数更贴切 —— 作为主泄漏信号使用。
+read_native_heap_kb() {
+  local n
+  n="$(adb shell dumpsys meminfo "$PKG" 2>/dev/null | tr -d '\r' \
+      | awk '/^[[:space:]]*Native Heap[[:space:]]/{print $3; exit}')"
   [[ "${n:-}" =~ ^[0-9]+$ ]] && echo "$n" || echo "-1"
 }
 
@@ -166,7 +195,7 @@ adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
 
 # ---------- 主循环：驱动压力 + 采样 ----------
 END=$(( $(date +%s) + DURATION_SEC ))
-printf 't_wall\tpss_kb\tfd\tthreads\tnote\n' > "$SAMPLES"
+printf 't_wall\tpss_kb\tnative_kb\tfd\tthreads\tnote\n' > "$SAMPLES"
 cycle=0
 while :; do
   now=$(date +%s)
@@ -202,17 +231,18 @@ while :; do
   pid="$(app_pid)"
   if [ -z "${pid:-}" ]; then
     # 进程没了 —— 可能崩溃或被系统回收，记 0 并在 note 标死，让判定抓到
-    printf '%s\t0\t-1\t-1\tDEAD(pid=0)\n' "$(date +%s)" >> "$SAMPLES"
+    printf '%s\t0\t-1\t-1\t-1\tDEAD(pid=0)\n' "$(date +%s)" >> "$SAMPLES"
     log "t=$now 进程未存活（pid=0）—— 记录 DEAD 并尝试重新拉起"
     adb shell am start -n "$ACTIVITY" >/dev/null 2>&1
     sleep 4
     continue
   fi
   pss="$(read_pss_kb)"
+  natv="$(read_native_heap_kb)"
   fd="$(read_fd_count "$pid")"
   th="$(read_threads "$pid")"
-  printf '%s\t%s\t%s\t%s\tpid=%s\n' "$(date +%s)" "$pss" "$fd" "$th" "$pid" >> "$SAMPLES"
-  log "t=$now cycle=$cycle pss=${pss}KB fd=$fd threads=$th"
+  printf '%s\t%s\t%s\t%s\t%s\tpid=%s\n' "$(date +%s)" "$pss" "$natv" "$fd" "$th" "$pid" >> "$SAMPLES"
+  log "t=$now cycle=$cycle pss=${pss}KB native=${natv}KB fd=$fd threads=$th"
 done
 
 # 让最后的 logcat flush
@@ -230,6 +260,8 @@ NOTALLOWED_COUNT="$(grep -cE 'openStage result=NotAllowed|NotAllowed' "$LOGCAT_R
 DEAD_COUNT="$(grep -c 'DEAD(pid=0)' "$SAMPLES" 2>/dev/null | tr -d ' ')"
 [ -z "$DEAD_COUNT" ] && DEAD_COUNT=0
 
+# 列序：$1 t_wall | $2 pss_kb | $3 native_kb | $4 fd | $5 threads | $6 note
+
 # PSS 前/后段均值 + 趋势（跳过 -1/0 噪声行）
 read PSS_FIRST PSS_LAST PSS_SLOPE_PCT MONO <<<"$(awk -F'\t' '
   NR>1 && $2>0 {n++; pss[n]=$2}
@@ -244,17 +276,28 @@ read PSS_FIRST PSS_LAST PSS_SLOPE_PCT MONO <<<"$(awk -F'\t' '
     printf "%d %d %.2f %d\n", m1, m2, pct, mm
   }' "$SAMPLES")"
 
-# fd 趋势（同样跳过 -1）
+# 原生堆趋势：SpatialCue 泄漏的主信号（无需 root，release 包也测得到）
+read NATV_FIRST NATV_LAST NATV_SLOPE_PCT NATV_MONO <<<"$(awk -F'\t' '
+  NR>1 && $3>0 {n++; v[n]=$3}
+  END{
+    if(n<4){print "0 0 0 0"; exit}
+    half=int(n/2); s1=0; for(i=1;i<=half;i++)s1+=v[i]; m1=s1/half;
+    s2=0; k=0; for(i=half+1;i<=n;i++){s2+=v[i];k++}; m2=(k?s2/k:m1);
+    pct=(m1>0)?(m2-m1)*100.0/m1:0;
+    mono=0; for(i=2;i<=n;i++){if(v[i]>=v[i-1])mono++;}
+    printf "%d %d %.2f %d\n", m1, m2, pct, (mono>=n-1)?1:0
+  }' "$SAMPLES")"
+
+# fd 趋势（列 $4；-1 表示不可测，须整条判 N/A，不得当作 0 通过）
 read FD_FIRST FD_LAST FD_MONO <<<"$(awk -F'\t' '
-  NR>1 && $3>=0 {n++; fd[n]=$3}
-  END{ if(n<2){print "0 0 0"; exit}
+  NR>1 && $4>0 {n++; fd[n]=$4}
+  END{ if(n<2){print "-1 -1 0"; exit}
     mono=0; for(i=2;i<=n;i++){if(fd[i]>=fd[i-1])mono++;}
-    mm=(mono>=n-1)?1:0;
-    printf "%d %d %d\n", fd[1], fd[n], mm }' "$SAMPLES")"
+    printf "%d %d %d\n", fd[1], fd[n], ((mono>=n-1)?1:0) }' "$SAMPLES")"
 
 read TH_FIRST TH_LAST <<<"$(awk -F'\t' '
-  NR>1 && $4>=0 {n++; th[n]=$4}
-  END{ if(n<2){print "0 0"; exit} printf "%d %d\n", th[1], th[n] }' "$SAMPLES")"
+  NR>1 && $5>0 {n++; th[n]=$5}
+  END{ if(n<2){print "-1 -1"; exit} printf "%d %d\n", th[1], th[n] }' "$SAMPLES")"
 
 # ---------- 判定 ----------
 VERDICT=0
@@ -271,30 +314,57 @@ VERDICT=0
   # pss_ok = 涨幅未破线即 PASS；MONO 只做人工参考列（"非单调上升"的语义已包含在
   # "涨幅 < 阈值" 里 —— 真泄漏必然伴随 >15% 累计涨幅，flat PSS 单调但涨幅为 0 属 PASS）。
   pss_ok=$(awk "BEGIN{ if((${PSS_SLOPE_PCT:-0}) < ${PSS_GROWTH_PCT}) print \"PASS\"; else print \"FAIL\" }")
-  fd_ok=$([ "${FD_LAST:-0}" -le $(( ${FD_FIRST:-0} + FD_SLACK )) ] && echo PASS || echo FAIL)
-  th_ok=$([ "${TH_LAST:-0}" -le $(( ${TH_FIRST:-0} + THREAD_SLACK )) ] && echo PASS || echo FAIL)
+  natv_ok=$(awk "BEGIN{ if((${NATV_SLOPE_PCT:-0}) < ${NATV_GROWTH_PCT}) print \"PASS\"; else print \"FAIL\" }")
+  # fd 在 release（非可调试）包上读不到 → 记 N/A，绝不按「0 ≤ 0+slack」白送 PASS。
+  if [ "${FD_FIRST:-0}" -gt 0 ] && [ "${FD_LAST:-0}" -gt 0 ]; then
+    fd_delta=$((FD_LAST-FD_FIRST))
+    fd_ok=$([ "$fd_delta" -le "$FD_SLACK" ] && echo PASS || echo FAIL)
+    fd_row="| fd 数 | ${FD_FIRST} | ${FD_LAST} | +${fd_delta} | ≤首值+${FD_SLACK} | ${fd_ok} |"
+  else
+    fd_delta=0; fd_ok="N/A"
+    fd_row="| fd 数 | 不可测 | 不可测 | — | release 非可调试，无 root 读不到 /proc/pid/fd；句柄泄漏改由原生堆判定 | N/A |"
+  fi
+  if [ "${TH_FIRST:-0}" -gt 0 ] && [ "${TH_LAST:-0}" -gt 0 ]; then
+    th_delta=$((TH_LAST-TH_FIRST))
+    th_ok=$([ "$th_delta" -le "$THREAD_SLACK" ] && echo PASS || echo FAIL)
+  else
+    th_delta=0; th_ok="N/A"
+  fi
   echo "| PSS(KB) | ${PSS_FIRST} | ${PSS_LAST} | +${PSS_SLOPE_PCT}% | <${PSS_GROWTH_PCT}% 且非单调 | ${pss_ok} |"
-  echo "| fd 数 | ${FD_FIRST} | ${FD_LAST} | +$((FD_LAST-FD_FIRST)) | ≤首值+${FD_SLACK} | ${fd_ok} |"
-  echo "| 线程数 | ${TH_FIRST} | ${TH_LAST} | +$((TH_LAST-TH_FIRST)) | ≤首值+${THREAD_SLACK} | ${th_ok} |"
+  echo "| 原生堆(KB) | ${NATV_FIRST} | ${NATV_LAST} | +${NATV_SLOPE_PCT}% | <${NATV_GROWTH_PCT}%（P3#4 主信号） | ${natv_ok} |"
+  echo "$fd_row"
+  echo "| 线程数 | ${TH_FIRST} | ${TH_LAST} | +${th_delta} | ≤首值+${THREAD_SLACK} | ${th_ok} |"
   echo "| FATAL/ANR | — | ${FATAL_COUNT} 次 | — | =${MAX_FATAL}（硬红线） | $([ "${FATAL_COUNT:-0}" -le "$MAX_FATAL" ] && echo PASS || echo FAIL) |"
   echo "| 进程死亡样本 | — | ${DEAD_COUNT} 次 | — | =0 | $([ "${DEAD_COUNT:-0}" -eq 0 ] && echo PASS || echo FAIL) |"
+  echo
+  echo "> 泄漏判定说明：P3#4 泄漏的是原生音频句柄。release 包不可调试时 fd 数读不到，"
+  echo "> 故以 \`dumpsys meminfo\` 的 **Native Heap** 趋势为主泄漏信号（无需权限，且对原生泄漏比 fd 更贴切）；"
+  echo "> fd 可测时（debug 包 / userdebug 镜像）作为交叉印证。"
   echo
   echo "### 观察项（不计红线，但须人工复核）"
   echo "- openStage NotAllowed 出现 ${NOTALLOWED_COUNT} 次（重试逻辑在 DualStateController，本次禁改；反复出现=模拟器 houdini 特征，真机复现按 P0 升级）"
   echo "- PSS 逐样本单调上升标志 mono=${MONO}（=1 且 pss 明显增长 → 疑似持续泄漏，需查 P3#4 句柄或 P3#3 纹理）"
-  echo "- fd 逐样本单调上升标志 mono=${FD_MONO}（=1 且 fd 净增 → 疑似原生句柄泄漏，直击 P3#4）"
+  echo "- 原生堆单调上升标志 mono=${NATV_MONO}（=1 且净增 → 直击 P3#4 句柄泄漏）"
+  echo "- fd 逐样本单调上升标志 mono=${FD_MONO}（fd 不可测时无意义）"
 } > "$REPORT"
 
 echo
 log "报告已写入 $REPORT"
 [ -f "$REPORT" ] && cat "$REPORT"
 
-# 退出码判定：任一 FAIL → 1
+# 退出码判定：任一 FAIL → 1（fd/线程不可测记 N/A，不参与判负，由原生堆兜底）
 if awk "BEGIN{exit !(${PSS_SLOPE_PCT:-0} >= ${PSS_GROWTH_PCT})}"; then VERDICT=1; fi
-[ "${FD_LAST:-0}" -gt $(( ${FD_FIRST:-0} + FD_SLACK )) ] && VERDICT=1
-[ "${TH_LAST:-0}" -gt $(( ${TH_FIRST:-0} + THREAD_SLACK )) ] && VERDICT=1
+if awk "BEGIN{exit !(${NATV_SLOPE_PCT:-0} >= ${NATV_GROWTH_PCT})}"; then VERDICT=1; fi
+if [ "${FD_FIRST:-0}" -gt 0 ] && [ "${FD_LAST:-0}" -gt 0 ]; then
+  [ "$((FD_LAST-FD_FIRST))" -gt "$FD_SLACK" ] && VERDICT=1
+fi
+if [ "${TH_FIRST:-0}" -gt 0 ] && [ "${TH_LAST:-0}" -gt 0 ]; then
+  [ "$((TH_LAST-TH_FIRST))" -gt "$THREAD_SLACK" ] && VERDICT=1
+fi
 [ "${FATAL_COUNT:-0}" -gt "$MAX_FATAL" ] && VERDICT=1
 [ "${DEAD_COUNT:-0}" -gt 0 ] && VERDICT=1
+# 样本不足不得冒充通过
+[ "$(($(wc -l < "$SAMPLES")-1))" -lt 8 ] && { fail "❌ 有效样本 <8，不足以支撑判定（环境或采集故障）"; VERDICT=2; }
 
 echo
 if [ "$VERDICT" -eq 0 ]; then
