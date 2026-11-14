@@ -13,6 +13,7 @@ import com.pico.spatial.core.math.Vector3
 import com.pico.spatial.sense.world.WorldTrackingManager
 import com.pico.spatial.sense.world.WorldTrackingResult
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -49,7 +50,25 @@ object AnchorScene {
     const val ACTION_AIM_SIMULATE = "com.memorypalace.anchor.AIM_SIMULATE"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private lateinit var store: AnchorStore
+    /** 冷启动 store 读盘 + JSON 解析专用后台 scope（不进主线程关键路径）。 */
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * 锚点持久层。
+     *
+     * P3 启动 ANR 加固（准入「无卡死」直接威胁项）：以前 `register()` 在 Application.onCreate
+     * 主线程上同步 `AnchorStore(context)`（构造即 getSharedPreferences 首次读盘）+ `store.load()`
+     * （全量 JSON 解析）—— 记录一多就是一条 StrictMode DiskRead，正是"启动 ANR 嫌疑链"。
+     * 现在这两步挪进 [ioScope]，主线程只留广播注册（廉价）。
+     *
+     * 用 deferred 而非 lateinit 直接赋值：所有会读改 [records] 并落盘的路径
+     * （[bind]/[clear]/[downgradeLost]）先 [awaitStore] 再动手，保证"载入完成"严格早于
+     * "第一次读改"，不会因为异步化引入"加载未完就先写、随后 load 结果覆盖写"的丢更新竞态。
+     */
+    private val storeReady = CompletableDeferred<AnchorStore>()
+
+    /** 等待持久层就绪（= 冷启动 load 已完成）。所有落盘路径的前置。 */
+    private suspend fun awaitStore(): AnchorStore = storeReady.await()
 
     /**
      * 串行化对 [records] 的读-改-写 + 落盘。
@@ -59,7 +78,7 @@ object AnchorScene {
      */
     private val recordsLock = Mutex()
 
-    /** 当前锚定记录；RoomStage 观察它重建场景实体。 */
+    /** 当前锚定记录；RoomStage 观察它做**增量**挂/卸场景实体（P3：不再整树重建）。 */
     val records = MutableStateFlow<List<AnchorRecord>>(emptyList())
 
     /**
@@ -86,9 +105,26 @@ object AnchorScene {
     }
 
     fun register(context: Context) {
-        store = AnchorStore(context.applicationContext)
-        records.value = store.load()
-        Log.i(TAG, "restored ${records.value.size} anchor record(s) from store")
+        // 冷启动不在主线程做磁盘 IO：AnchorStore 构造即 getSharedPreferences（首次同步读盘），
+        // load() 解析全部记录（坏记录逐条隔离、好记录保留的 P2 语义原样保留），整块挪到 IO。
+        // 主线程只保留广播注册。records 本就是 StateFlow，UI 多等一帧空态无感。
+        val appContext = context.applicationContext
+        ioScope.launch {
+            runCatching {
+                val s = AnchorStore(appContext)
+                s.load() to s
+            }.onSuccess { (recs, store) ->
+                // 先填 records 再放行 awaitStore：确保任何读改路径看到的都是"已载入"态。
+                records.value = recs
+                storeReady.complete(store)
+                Log.i(TAG, "restored ${recs.size} anchor record(s) from store (off main thread)")
+            }.onFailure { t ->
+                // load 抛错兜底：仍放行一个可用 store，避免 place/clear 永久挂起；
+                // **不**把 records 置空覆盖磁盘（无任何 save 调用）—— P2 语义：load 失败不覆写。
+                Log.e(TAG, "anchor store load failed; records stay empty, persistence still writable", t)
+                runCatching { storeReady.complete(AnchorStore(appContext)) }
+            }
+        }
 
         val filter = IntentFilter().apply {
             addAction(ACTION_PLACE)
@@ -154,6 +190,7 @@ object AnchorScene {
      * suspend：读卡片要走 Room 查询，不能在广播回调的主线程上同步做。
      */
     private suspend fun firstUnanchoredCardId(): String? = runCatching {
+        awaitStore() // 载入完成后"已锚定集合"才可信，否则会把已有锚点的卡误判为未锚定
         val cards = DataGraph.repository.cards.first()
         val anchored = records.value.map { it.key }.toSet()
         cards.firstOrNull { it.id !in anchored }?.id
@@ -176,6 +213,7 @@ object AnchorScene {
      */
     fun placeForCard(cardId: String, x: Float, y: Float, z: Float, yaw: Float = 0f, label: String? = null) {
         scope.launch {
+            awaitStore() // 载入完成后再做"是否已锚定"判断，避免 load 未完时的假阴性重复放置
             val card = DataGraph.repository.cards.first().firstOrNull { it.id == cardId }
             if (card == null) {
                 Log.w(TAG, "placeForCard: card not found $cardId")
@@ -308,6 +346,9 @@ object AnchorScene {
                 return
             }
         }
+        // 落盘前先确保冷启动 load 已完成：异步化后若允许写路径抢在 load 前跑，
+        // 会出现「写空/写少 → load 结果再覆盖」的丢更新；awaitStore 把顺序钉死为 load→写。
+        val store = awaitStore()
         recordsLock.withLock {
             // 去重追加：同 key（同卡片）以最新一条为准，防止取点连发或重启重复建出两条同 key 记录
             records.value = records.value.filterNot { it.key == rec.key } + rec
@@ -320,6 +361,8 @@ object AnchorScene {
 
     fun clear() {
         scope.launch {
+            // 同 bind：落盘前门控 load 完成，避免"clear 写空早于 load 回写"竞态。
+            val store = awaitStore()
             // P2 中危：removeAnchor 失败也照删记录 → 系统侧锚点变无主泄漏，且再无从应用内清理的路径。
             // 修法：逐条尝试删除，成功的记录才落盘；失败的记录（含服务瞬时不可用）保留待下次 clear /
             // verifyRestored 重试，绝不静默丢弃其 UUID。
@@ -445,6 +488,7 @@ object AnchorScene {
     private suspend fun downgradeLost() {
         val lostUuids = synchronized(lostLock) { lost.toSet().also { lost.clear() } }
         if (lostUuids.isEmpty()) return
+        val store = awaitStore()
         recordsLock.withLock {
             records.value = records.value.map { rec ->
                 if (rec.uuid in lostUuids) rec.copy(uuid = null) else rec

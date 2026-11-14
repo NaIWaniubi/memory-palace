@@ -16,7 +16,6 @@ import com.memorypalace.core.importer.TextImporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -235,11 +234,19 @@ object ImportService {
         }
     }
 
-    /** 按 front 去重后批量入库。 */
+    /**
+     * 按 front 去重后批量入库（P3 卡死项：导入 O(n²) 全表 Flow 重算）。
+     *
+     * before：`repository.cards.first()` 拉**整表实体**只为取 front；再逐条 `repository.add()`，
+     *         每张卡触发一次单条 upsert 事务 + 一次 `observeAll()` 全表 Flow 重发，
+     *         下游（DueQueueView remember、AnchorCard collectAsState）各再 O(全表) 重算 → 千张卡数分钟级卡顿。
+     * after ：`existingFronts()` 只投影 front 列；`addAll` 分块（500/块）走单事务批量插入，
+     *         千张卡 ≈ 2 个事务 / 2 次 Flow 重发，而非 1000 个。
+     */
     suspend fun persistImported(fmt: String, cards: List<ImportedCard>): ImportStats = persistLock.withLock {
-        val existing = DataGraph.repository.cards.first().map { it.front }
+        val existing = DataGraph.repository.existingFronts()
         val plan = planImportDedup(existing, cards)
-        plan.toInsert.forEach { c -> DataGraph.repository.add(c.front, c.back) }
+        DataGraph.repository.addAll(plan.toInsert.map { it.front to it.back })
         val stats = ImportStats(format = fmt, parsed = cards.size, imported = plan.toInsert.size, skippedDup = plan.duplicates)
         Log.i(TAG, "import result: $stats")
         stats
