@@ -130,7 +130,16 @@ object RoomPlaneMapper {
             Log.w(TAG, "plane ${anchor.anchorUUID} 中心坐标非有限值，丢弃")
             return null
         }
-        val quat = Quat(t.quaternion.x, t.quaternion.y, t.quaternion.z, t.quaternion.w).normalized()
+        // P1[高]#1：core 的 Quat.normalized() 已把非有限分量挡成 IDENTITY，
+        // 但这里再显式校验一次，把"信了 center/verts 却漏了 quat"的意图留在本地，
+        // 不依赖 core 的隐式行为。非法四元数退回 IDENTITY（等价于只信中心+法线方向）。
+        val q = t.quaternion
+        val quat = if (q.x.isFinite() && q.y.isFinite() && q.z.isFinite() && q.w.isFinite()) {
+            Quat(q.x, q.y, q.z, q.w).normalized()
+        } else {
+            Log.w(TAG, "plane ${anchor.anchorUUID} 四元数含非有限值，退回单位四元数")
+            Quat.IDENTITY
+        }
         val verts = anchor.vertices.map { Vec3(it.x, it.y, it.z) }.filter { it.isFinite() }
 
         // 法线来源优先级：
@@ -155,6 +164,15 @@ object RoomPlaneMapper {
         val bbox = anchor.boundingBoxSize
         val halfU = abs(bbox.x) / 2f
         val halfV = abs(bbox.y) / 2f
+        // P1[高]#1 真正的幽灵平面入口：boundingBoxSize 没做有限性校验，而
+        // PlaneShape.build 只校验 center/normal，NaN 的 halfU/halfV 会被原样带进
+        // shape；面积退化成 4*NaN=NaN，旧判定 `area < 0.005f` 对 NaN 恒 false，
+        // 平面不被丢弃、covers 又因 NaN 比较恒 false 永远点不中 → "日志成功、
+        // 永不命中"的幽灵平面。这里显式丢弃非有限尺寸。
+        if (!halfU.isFinite() || !halfV.isFinite()) {
+            Log.w(TAG, "plane ${anchor.anchorUUID} boundingBoxSize 非有限值 (${bbox.x},${bbox.y})，丢弃")
+            return null
+        }
 
         // 轮廓：只在顶点与 anchor 位姿**同一个坐标系**时才用。
         //
@@ -171,7 +189,10 @@ object RoomPlaneMapper {
                 Log.w(TAG, "plane ${anchor.anchorUUID} 法线退化，丢弃")
                 return null
             }
-        val polyCentroid = if (verts.size >= 3) centroidOf(verts) else null
+        // P1[中]#2：形心改用面积加权（鞋带/扇形三角剖分），不再用顶点算术平均。
+        // 算术平均对顶点疏密不均的合法大平面（L 形桌、整墙）会偏离 anchor 的
+        // 面积/包围盒中心，越过 0.35m 绝对阈值 → 同坐标系的正确轮廓被误退回矩形。
+        val polyCentroid = if (verts.size >= 3) centroidOf(verts, normal) else null
         val centroidGap = polyCentroid?.let { (it - center).length() } ?: Float.MAX_VALUE
         val useOutline = polyCentroid != null && centroidGap < 0.35f
         val outline = if (useOutline) verts.map { base.project(it) } else null
@@ -184,9 +205,11 @@ object RoomPlaneMapper {
         } else {
             4f * halfU * halfV
         }
-        if (area < 0.005f) {
-            // 5cm² 以下的碎片（噪声平面）不参与取点：点中了也没法放卡片
-            Log.i(TAG, "plane ${anchor.anchorUUID} 面积 ${"%.4f".format(area)} m² 过小，丢弃")
+        if (!(area >= 0.005f)) {
+            // 5cm² 以下的碎片（噪声平面）不参与取点：点中了也没法放卡片。
+            // 用 `!(area >= …)` 而非 `area < …`：后者对 NaN 恒 false，会让面积
+            // 非有限的僵尸平面躲过过滤（P1[高]#1 的兜底防线）。
+            Log.i(TAG, "plane ${anchor.anchorUUID} 面积 ${"%.4f".format(area)} m² 过小/非法，丢弃")
             return null
         }
 
@@ -233,13 +256,36 @@ object RoomPlaneMapper {
         }
     }
 
-    /** 顶点质心。用于校验 vertices 与 transform.position 是否同一坐标系。 */
-    fun centroidOf(pts: List<Vec3>): Vec3 {
-        if (pts.isEmpty()) return Vec3.ZERO
+    /**
+     * 顶点多边形的**面积加权形心**（扇形三角剖分 + 有符号面积），用于校验
+     * vertices 与 transform.position 是否同一坐标系。
+     *
+     * 相比旧的顶点算术平均：凹形/疏密不均的合法轮廓（L 形桌、带缺口的墙）算出的
+     * 形心与 anchor 的面积/包围盒中心一致，不会误判坐标系不同（P1[中]#2）。
+     * 用有符号面积累加，对简单凹多边形也成立（重叠三角自动相消）。
+     *
+     * 先过滤非有限顶点（调用方已 filter，这里再兜一层防 NaN 拽偏）。
+     * 顶点少于 3 / 面积≈0 / 法线退化 → 返回 null（退回矩形轮廓）。
+     * normal 约定为单位向量；即使非单位，只影响有符号面积的缩放，形心是缩放不变量，
+     * 结果仍正确（前提：normal 与多边形平面近似垂直、非零）。
+     */
+    fun centroidOf(pts: List<Vec3>, normal: Vec3): Vec3? {
+        val p = pts.filter { it.isFinite() }
+        if (p.size < 3) return null
+        val p0 = p[0]
+        var area2 = 0f // 2× 有符号总面积
         var sx = 0f; var sy = 0f; var sz = 0f
-        pts.forEach { sx += it.x; sy += it.y; sz += it.z }
-        val n = pts.size.toFloat()
-        return Vec3(sx / n, sy / n, sz / n)
+        for (i in 1 until p.size - 1) {
+            val a = p[i] - p0
+            val b = p[i + 1] - p0
+            val signed = (a cross b) dot normal
+            area2 += signed
+            sx += signed * (p0.x + p[i].x + p[i + 1].x) / 3f
+            sy += signed * (p0.y + p[i].y + p[i + 1].y) / 3f
+            sz += signed * (p0.z + p[i].z + p[i + 1].z) / 3f
+        }
+        if (abs(area2) < 1e-6f) return null
+        return Vec3(sx / area2, sy / area2, sz / area2)
     }
 
     /** 鞋带公式，返回绝对面积。 */

@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -44,6 +45,9 @@ import kotlinx.coroutines.launch
 object AimPlacement {
 
     const val TAG = "Aim"
+
+    /** 合成射线的输入独占窗口（毫秒）；到期若无真实命中接管则复位 aim 状态（P1[高]#6）。 */
+    private const val SIM_EXCLUSIVE_MS = 5_000L
 
     enum class Source(val text: String) {
         CONTROLLER_RIGHT("右手柄"),
@@ -111,10 +115,23 @@ object AimPlacement {
     private var handJob: Job? = null
     private var controller: ControllerTrackingProvider? = null
     private var hand: HandTrackingProvider? = null
-    private var running = false
+    // P1[高]#5：running 被 controllerJob/handJob（Dispatchers.Default 多线程）与 stop()
+    // （UI 线程）并发读写，必须 @Volatile，否则在途帧读不到 stop 的置位、把状态又翻回 true。
+    @Volatile private var running = false
 
-    private var controllerTriggerDown = false
-    private var handPinchDown = false
+    // P1[中]#7：扳机/捏合闩锁由 SDK 回调线程写、可能被另一路径读；@Volatile 保证可见性，
+    // 且 stop() 必须清闩，否则退出房间时正好按住、重进后第一次扳机被吞（闩锁还停在 true）。
+    @Volatile private var controllerTriggerDown = false
+    @Volatile private var handPinchDown = false
+
+    /**
+     * 每次"写出一条命中"自增（见 publish 命中分支）。simulateRay 用它判断
+     * 独占到期后是否已被某条真实命中接管：若版本号没变，说明没有任何后续命中，
+     * 才把 aim 状态复位，避免模拟器/无头环境下 aimActive 永久假可用。P1[高]#6。
+     * 用 AtomicLong：publish 由 controller/hand 两条流并发调用，`long++` 非原子。
+     */
+    private val aimVersion = java.util.concurrent.atomic.AtomicLong(0L)
+    private var simExpiryJob: Job? = null
 
     fun start() {
         if (running) return
@@ -129,7 +146,14 @@ object AimPlacement {
 
     fun stop() {
         if (!running) return
-        running = false
+        running = false // 先翻标志：publish/fire 入口检查会立刻拒绝后续在途帧
+        // P1[中]#7：清闩锁，否则退出时正按住扳机/捏着指，重进房间第一次被吞。
+        controllerTriggerDown = false
+        handPinchDown = false
+        // P1[高]#6：取消挂起的模拟到期协程并解除独占窗口。
+        simExpiryJob?.cancel()
+        simExpiryJob = null
+        simulatedUntil = 0L
         controllerJob?.cancel()
         handJob?.cancel()
         controllerJob = null
@@ -141,6 +165,7 @@ object AimPlacement {
         lastAim = null
         _label.value = null
         _aimActive.value = false
+        lastHadHit = false
         _source.value = Source.NONE
         Log.i(TAG, "aim tracking stopped")
     }
@@ -297,6 +322,9 @@ object AimPlacement {
     private var lastHadHit = false
 
     private fun publish(ray: Ray, source: Source, simulated: Boolean = false) {
+        // P1[高]#5：controllerJob 与 handJob 在 Dispatchers.Default 上并发调用本函数，
+        // stop() 后还可能在途。入口先看 running，挡住"房间层销毁后又把 aimActive 翻回 true"。
+        if (!running) return
         if (!simulated && System.currentTimeMillis() < simulatedUntil) return
         _source.value = if (simulated) Source.CONTROLLER_RIGHT else source
         val planes = PlaneSensor.planes.value
@@ -315,14 +343,16 @@ object AimPlacement {
                 )
             }
             lastHadHit = false
+            // P1[高]#5：先撤 aimActive 再清 lastAim —— 这样任何读者都不会观察到
+            // "aimActive=true 但 lastAim 已被清空"的中间态。每步都是 StateFlow/
+            // @Volatile 的单字段原子写（不再 `if(x) x=` 的读-改-写）。
+            _aimActive.value = false
             lastAim = null
-            if (_aimActive.value) _aimActive.value = false
             _frames.tryEmit(null)
-            if (_label.value != null) _label.value = null
+            _label.value = null
             return
         }
         lastHadHit = true
-        if (!_aimActive.value) _aimActive.value = true
         val plane = planes.firstOrNull { it.shape === hit.plane }
         val label = plane?.label ?: "平面"
         if (simulated || !lastHadHitBefore) {
@@ -349,13 +379,21 @@ object AimPlacement {
             planeUuid = plane?.uuid ?: "",
             source = source,
         )
+        // P1[高]#5/#6：先落 lastAim、自增 aimVersion，再翻 aimActive —— 保证
+        // aimActive=true 时 lastAim 必是本次命中的最新值；aimVersion 供模拟到期
+        // 复位协程判断"是否已被后续命中接管"。
         lastAim = aim
+        aimVersion.incrementAndGet()
+        _aimActive.value = true
         _frames.tryEmit(aim)
-        val text = aim.describe()
-        if (_label.value != text) _label.value = text
+        _label.value = aim.describe()
     }
 
     private fun fire(how: String) {
+        if (!running) {
+            Log.i(TAG, "$how 触发，但取点已停止（房间层可能已销毁），忽略")
+            return
+        }
         val aim = lastAim
         val handler = onTrigger
         if (aim == null) {
@@ -364,6 +402,16 @@ object AimPlacement {
         }
         if (handler == null) {
             Log.i(TAG, "$how 触发，但未处于放置模式，忽略：${aim.describe()}")
+            return
+        }
+        // P1[高]#6：确认前校验命中平面仍在当前平面列表里。否则 lastAim 可能指向一个
+        // 已被 REMOVED / 已 clearDemoPlanes 的过期锚点，把卡片钉到不存在的 planeUuid 上。
+        val uuid = aim.planeUuid
+        if (uuid.isNotEmpty() && PlaneSensor.planes.value.none { it.uuid == uuid }) {
+            Log.w(TAG, "$how 命中已失效平面 uuid=$uuid（已不在 planes），忽略并复位瞄准状态")
+            lastAim = null
+            _aimActive.value = false
+            _label.value = null
             return
         }
         Log.i(TAG, "$how 触发 → ${aim.describe()} point=(${aim.point.x},${aim.point.y},${aim.point.z})")
@@ -389,14 +437,46 @@ object AimPlacement {
             "simulateRay origin=(${origin.x},${origin.y},${origin.z}) " +
                 "dir=(${direction.x},${direction.y},${direction.z})"
         )
+        if (!running) {
+            Log.w(TAG, "simulateRay 忽略：取点未运行（先 start()/进房间层）")
+            return
+        }
         // 5 秒内屏蔽真实输入（模拟器手势跟踪是开着的，否则下一帧就被覆盖）
-        simulatedUntil = System.currentTimeMillis() + 5_000L
+        simulatedUntil = System.currentTimeMillis() + SIM_EXCLUSIVE_MS
         publish(Ray.of(origin, direction), source, simulated = true)
+        // P1[高]#6：注入命中后 _aimActive/lastAim 已置真，但复位原本只发生在"下一次
+        // publish 走进无命中分支"。模拟器/无头环境里广播只发一次、没有后续硬件帧 →
+        // aimActive 永久假可用，confirmManually 会把卡钉到过期锚点。挂一个与独占窗口
+        // 对齐的一次性协程：到点若 aimVersion 未变（没有新的真实命中接管）就复位。
+        val capturedVersion = aimVersion.get()
+        val until = simulatedUntil
+        simExpiryJob?.cancel()
+        simExpiryJob = scope.launch {
+            delay(SIM_EXCLUSIVE_MS + 100)
+            if (running && aimVersion.get() == capturedVersion && System.currentTimeMillis() >= until) {
+                lastAim = null
+                _aimActive.value = false
+                lastHadHit = false
+                _label.value = null
+                _frames.tryEmit(null)
+                Log.i(TAG, "模拟瞄准到期且无真实输入接管 → 复位 aimActive=false")
+            }
+        }
     }
 
-    /** 取消合成瞄准的独占（恢复真实输入）。 */
+    /** 取消合成瞄准的独占并真正复位瞄准状态（避免清完模拟后 aimActive 仍停在 true）。 */
     fun clearSimulation() {
         simulatedUntil = 0L
-        Log.i(TAG, "simulation cleared")
+        simExpiryJob?.cancel()
+        simExpiryJob = null
+        // P1[高]#6：复位模拟注入留下的 aim 状态；之后真实帧会自然接管。
+        if (running) {
+            lastAim = null
+            _aimActive.value = false
+            lastHadHit = false
+            _label.value = null
+            _frames.tryEmit(null)
+        }
+        Log.i(TAG, "simulation cleared, aim state reset")
     }
 }

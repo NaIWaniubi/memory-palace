@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -48,8 +49,14 @@ object PlaneSensor {
     private val _updateCount = MutableStateFlow(0)
     val updateCount: StateFlow<Int> = _updateCount.asStateFlow()
 
+    /** 统一排序：水平面优先、其次面积大者。抽出避免 reload/增量两处漂移。 */
+    private val CMP: Comparator<RoomPlane> =
+        compareByDescending<RoomPlane> { it.isHorizontal }.thenByDescending { it.areaM2 }
+
+    private fun sorted(list: List<RoomPlane>): List<RoomPlane> = list.sortedWith(CMP)
+
     private var subscription: com.pico.spatial.core.lifecycle.Cancellable? = null
-    private var running = false
+    @Volatile private var running = false
 
     fun start() {
         if (running) {
@@ -108,8 +115,10 @@ object PlaneSensor {
     private suspend fun reload() {
         val result = runCatching { PlaneTrackingManager.loadAllAnchors() }
         result.onFailure { e ->
-            Log.e(TAG, "loadAllAnchors failed", e)
-            _status.value = Status.UNSUPPORTED
+            // P1[中]#4：一次 loadAllAnchors 抖动是"软失败"，绝不能把 status 永久钉死成
+            // UNSUPPORTED（只有 start() 里构造/订阅失败才是硬失败）。保持 SCANNING，允许重试。
+            if (running) Log.w(TAG, "loadAllAnchors 失败（软失败，保留 SCANNING，可重试）", e)
+            else Log.i(TAG, "loadAllAnchors 失败（已停止），忽略", e)
         }
         val anchors = result.getOrNull() ?: return
         val mapped = anchors.mapNotNull { anchor ->
@@ -117,36 +126,51 @@ object PlaneSensor {
                 .onFailure { Log.e(TAG, "map plane failed", it) }
                 .getOrNull()
         }
-        _planes.value = mapped.sortedWith(
-            compareByDescending<RoomPlane> { it.isHorizontal }.thenByDescending { it.areaM2 }
-        )
+        // P1[高]#3：与实时增量**合并不覆盖**。loadAllAnchors 挂起期间到达的 ADDED/UPDATED
+        // 已写进 _planes；以 cur 为底、用本次权威快照按 uuid 覆盖同名项，既刷新全量又不
+        // 吞掉加载窗口内的增量事件。StateFlow.update 内部 CAS 重试，跨线程安全。
+        // 取舍：reload 由此变"加性"，不再靠它清除 SDK 侧已消失的平面——实时 REMOVED 事件
+        // 负责精确删除（见 onPlaneUpdate），reload 不再整表覆盖以免丢增量。
+        _planes.update { cur ->
+            val byUuid = LinkedHashMap<String, RoomPlane>()
+            cur.forEach { byUuid[it.uuid] = it }
+            mapped.forEach { byUuid[it.uuid] = it }
+            sorted(byUuid.values.toList())
+        }
+        // 成功即复位（可能从早先软失败恢复）；仅仍运行时写，避免 stop 后把 UI 状态复活。
+        if (running) _status.value = Status.SCANNING
         Log.i(TAG, "loadAllAnchors -> ${anchors.size} anchor(s), ${mapped.size} usable: " +
             mapped.joinToString { it.describe() })
     }
 
     private fun onPlaneUpdate(update: AnchorUpdate<PlaneAnchor>) {
-        _updateCount.value += 1
+        _updateCount.update { it + 1 } // P1[高]#3：+= 非原子，改 CAS
         val event = runCatching { update.event }.getOrNull() ?: return
         val anchor = runCatching { update.anchor }.getOrNull()
         when (event) {
             AnchorUpdate.Event.ADDED, AnchorUpdate.Event.UPDATED, AnchorUpdate.Event.LOADED -> {
                 if (anchor == null) return
                 val plane = runCatching { RoomPlaneMapper.from(anchor) }.getOrNull() ?: return
-                val current = _planes.value
-                val idx = current.indexOfFirst { it.uuid == plane.uuid }
-                _planes.value = if (idx >= 0) {
-                    current.toMutableList().also { it[idx] = plane }
-                } else {
-                    (current + plane).sortedWith(
-                        compareByDescending<RoomPlane> { it.isHorizontal }.thenByDescending { it.areaM2 }
-                    )
+                // P1[高]#3：读-改-写整段进 CAS，避免与 reload() / 其他回调线程交错丢更新。
+                _planes.update { cur ->
+                    val idx = cur.indexOfFirst { it.uuid == plane.uuid }
+                    if (idx >= 0) cur.toMutableList().also { it[idx] = plane }
+                    else sorted(cur + plane)
                 }
                 Log.i(TAG, "event=$event uuid=${plane.uuid} -> ${plane.describe()} (total ${_planes.value.size})")
             }
             AnchorUpdate.Event.REMOVED -> {
-                val uuid = anchor?.anchorUUID?.toString() ?: return
-                _planes.value = _planes.value.filterNot { it.uuid == uuid }
-                Log.i(TAG, "event=REMOVED uuid=$uuid (left ${_planes.value.size})")
+                // P1[中]#4：不能因 anchor==null 就 return —— 那样被删平面永久滞留。
+                // anchor 非空按 UUID 精确删（不依赖 anchor 对象整体非空之外的一切）；
+                // 取不到 UUID（SDK 异常兜底路径）时退回一次 reload 重新同步。
+                val uuid = runCatching { anchor?.anchorUUID?.toString() }.getOrNull()
+                if (uuid != null) {
+                    _planes.update { cur -> cur.filterNot { it.uuid == uuid } }
+                    Log.i(TAG, "event=REMOVED uuid=$uuid (left ${_planes.value.size})")
+                } else {
+                    Log.w(TAG, "event=REMOVED 但拿不到 UUID，触发 reload 重新同步")
+                    if (running) scope.launch { reload() }
+                }
             }
             else -> Log.d(TAG, "event=$event ignored")
         }
@@ -204,8 +228,7 @@ object PlaneSensor {
     }
 
     fun clearDemoPlanes() {
-        val before = _planes.value.size
-        _planes.value = _planes.value.filterNot { it.uuid.startsWith("sim-") }
-        Log.i(TAG, "cleared simulated planes: $before -> ${_planes.value.size}")
+        _planes.update { cur -> cur.filterNot { it.uuid.startsWith("sim-") } }
+        Log.i(TAG, "cleared simulated planes, now ${_planes.value.size}")
     }
 }
