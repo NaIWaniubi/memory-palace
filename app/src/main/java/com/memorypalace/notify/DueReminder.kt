@@ -57,7 +57,54 @@ object DueReminder {
     class FireReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             Log.i(TAG, "alarm fired, posting due notification")
-            scope.launch { postDue(context) }
+            // P2 中危：onReceive 立即返回，postDue 里的 Room 查询/发通知跑在游离协程，
+            // 进程被回收则提醒静默丢失。用 goAsync 持住广播直到通知发完。
+            val pending = goAsync()
+            scope.launch {
+                try {
+                    postDue(context)
+                } finally {
+                    pending.finish()
+                }
+            }
+        }
+    }
+
+    /**
+     * 系统事件重排接收器（P2 高危：闹钟不跨重启 / 时区、时间跳变）。
+     *
+     * AlarmManager 闹钟不随设备重启存活；用户手改系统时间、跨时区出行也会让
+     * RTC_WAKEUP 绝对时刻错位。开机、时间改变、时区改变后都要按真实到期时间重排。
+     *
+     * 需在 `app/src/main/AndroidManifest.xml` 的 `<application>` 内静态注册（此文件不在本次
+     * 可改范围，故这里只实现逻辑，注册项见交付说明）：
+     * ```xml
+     * <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+     * <receiver android:name=".notify.DueReminder$ReminderReceiver" android:exported="false">
+     *   <intent-filter>
+     *     <action android:name="android.intent.action.BOOT_COMPLETED" />
+     *     <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+     *     <action android:name="android.intent.action.TIME_SET" />
+     *     <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+     *   </intent-filter>
+     * </receiver>
+     * ```
+     * 声明后进程会在这些事件被拉起，Application.onCreate（含 DataGraph.init）先于 onReceive 完成，
+     * 因此这里可直接调用 [schedule]。
+     */
+    class ReminderReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            Log.i(TAG, "system event ${intent.action} → rescheduling reminder")
+            val pending = goAsync()
+            scope.launch {
+                try {
+                    schedule(context.applicationContext)
+                } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
+                    Log.e(TAG, "reschedule after ${intent.action} failed", t)
+                } finally {
+                    pending.finish()
+                }
+            }
         }
     }
 
@@ -91,56 +138,32 @@ object DueReminder {
     /**
      * 按当前到期队列重排提醒。
      * 队列为空就取消提醒（没有到期卡片就不该响）。
+     *
+     * P2 高危修正：提醒**时刻**是交给 AlarmManager RTC_WAKEUP 的绝对时间，一律用真实时钟
+     * ([Clock.nowReal]) 与卡片存储的真实 dueAt 计算，绝不含时间机器的演示偏移。演示快进只
+     * 影响 UI 上的到期/褪色视图，不会让真闹钟提前/滞后。决策逻辑抽到纯函数 [decideReminder]。
      */
     suspend fun schedule(context: Context) {
         val cards = DataGraph.repository.cards.first()
-        val due = DataGraph.repository.dueQueue(cards)
-        val now = Clock.now()
-
-        // 提醒时刻的语义（这段踩过两个坑）：
-        //
-        // 坑 1：拿"最后一张到期卡"的 dueAt 当提醒时刻。到期队列里的卡 dueAt
-        //       可能全在过去（用户拖了几天没复习），setExact 会立刻触发，
-        //       变成"刚排上就响"，且每次重排重复发生。
-        //
-        // 坑 2（更隐蔽，2026-11-09 审查发现）：先算 dueQueue 再在里面找
-        //       "未来到期"的卡 —— 但 dueQueue 的定义就是 dueAt <= now，
-        //       所以 future 永远为空，永远走"立刻提醒"分支。结果是这个功能
-        //       从来没真正"到点才响"过，日志里只有 overdue-immediate 一种。
-        //
-        // 正确语义：在**全部卡片**里找最近的未来到期时刻。
-        //   - 找到 → 那个时刻提醒（"到点了"）
-        //   - 全是逾期的 → 立刻提醒一次（"你有 N 张卡正在褪色"）
-        //   - 一张卡都没有 → 取消提醒
-        val nextFuture = cards.map { it.dueAt }.filter { it > now }.minOrNull()
-
-        val fireAt: Long
-        val mode: String
-        when {
-            nextFuture != null -> {
-                fireAt = nextFuture
-                mode = "scheduled"
-            }
-            due.isNotEmpty() -> {
-                fireAt = now + IMMEDIATE_DELAY_MILLIS
-                mode = "overdue-immediate"
-            }
-            else -> {
+        val realNow = Clock.nowReal()
+        val dueCount = cards.count { it.dueAt <= realNow }
+        when (val plan = decideReminder(cards.map { it.dueAt }, realNow, IMMEDIATE_DELAY_MILLIS)) {
+            is ReminderPlan.Cancel -> {
                 cancel(context)
                 Log.i(TAG, "no card at all, reminder cancelled")
-                return
+            }
+            is ReminderPlan.Fire -> {
+                setAlarm(context, plan.fireAt, realNow)
+                Log.i(
+                    TAG,
+                    "reminder ${plan.mode}: fireAt=${plan.fireAt} (${(plan.fireAt - realNow) / 1000}s from now) " +
+                        "cards=${cards.size} dueCount=$dueCount",
+                )
             }
         }
-
-        setAlarm(context, fireAt)
-        Log.i(
-            TAG,
-            "reminder $mode: fireAt=$fireAt (${(fireAt - now) / 1000}s from now) " +
-                "cards=${cards.size} dueCount=${due.size} nextFuture=${nextFuture ?: "none"}"
-        )
     }
 
-    private fun setAlarm(context: Context, fireAt: Long) {
+    private fun setAlarm(context: Context, fireAt: Long, realNow: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: run {
             Log.w(TAG, "AlarmManager unavailable")
             return
@@ -151,8 +174,9 @@ object DueReminder {
             Intent(context, FireReceiver::class.java).setAction(ACTION_FIRE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        // 提醒时刻必须在未来，否则 setExact 会立刻触发
-        val target = maxOf(fireAt, Clock.now() + 1000)
+        // 提醒时刻必须在未来，否则 setExact 会立刻触发。fireAt 已是真实绝对时刻，
+        // 兜底也只按真实时钟抬到 realNow+1s，绝不掺入演示偏移（P2：偏移污染 RTC_WAKEUP）。
+        val target = maxOf(fireAt, realNow + 1000)
 
         val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             am.canScheduleExactAlarms()
@@ -215,5 +239,37 @@ object DueReminder {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val am = context.getSystemService(AlarmManager::class.java) ?: return false
         return am.canScheduleExactAlarms()
+    }
+}
+
+// ---------- 纯决策（真实时钟语义，JVM 可单测；见 schedule） ----------
+
+/** 到期提醒的调度裁决。 */
+internal sealed class ReminderPlan {
+    /** 在真实绝对时刻 [fireAt] 响一次；[mode] 仅用于日志（scheduled / overdue-immediate）。 */
+    data class Fire(val fireAt: Long, val mode: String) : ReminderPlan()
+
+    /** 无任何到期卡 → 取消提醒。 */
+    object Cancel : ReminderPlan()
+}
+
+/**
+ * 依据卡片存储的**真实** dueAt 与真实当前时刻，决定闹钟落点。
+ *
+ * 语义（对应原注释里的两个坑，保持不变，只是全部走真实时间）：
+ *  - 有未来到期的卡 → 最近的那个真实 dueAt 落一次（"到点了"）
+ *  - 没有未来、但有已逾期 → realNow + immediateDelayMs 落一次（"你有 N 张正在褪色"）
+ *  - 一张卡都没有 → 取消
+ *
+ * 这里不掺入任何演示偏移：dueAts 已是真实时间（[com.memorypalace.data.CardRepository] 用
+ * [com.memorypalace.data.Clock.nowReal] 落库），realNow 也是真实时间，RTC_WAKEUP 直接可用，
+ * 进程重启 / 时间机器快进都不会让落点错位（P2 高危 Clock 污染项的根治点）。
+ */
+internal fun decideReminder(dueAts: List<Long>, realNow: Long, immediateDelayMs: Long): ReminderPlan {
+    val nextFuture = dueAts.filter { it > realNow }.minOrNull()
+    return when {
+        nextFuture != null -> ReminderPlan.Fire(nextFuture, "scheduled")
+        dueAts.any { it <= realNow } -> ReminderPlan.Fire(realNow + immediateDelayMs, "overdue-immediate")
+        else -> ReminderPlan.Cancel
     }
 }

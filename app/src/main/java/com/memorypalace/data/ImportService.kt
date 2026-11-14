@@ -18,8 +18,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 
 /**
  * 导入服务（M5）：CSV / 纯文本 / Anki apkg 三种格式，离线本地解析，不联网。
@@ -37,6 +40,13 @@ object ImportService {
     const val ACTION_IMPORT = "com.memorypalace.card.IMPORT"
     const val ACTION_PREVIEW = "com.memorypalace.card.PREVIEW"  // 无头验证确认页用：只解析不入库
     const val ACTION_CONFIRM = "com.memorypalace.card.CONFIRM"  // 无头验证确认页用：等价点「确认导入」
+
+    /**
+     * 导入大小闸（P2 高危：CSV/TXT readText 无尺寸上限 → 超大文件整份进内存 OOM 崩进程）。
+     * 选 32 MiB：够装下任何合理词表 CSV/TXT；再大直接拒绝解析并提示，安全失败而非崩溃。
+     * apkg 的 zip bomb 另由 [ApkgExtractor.extractCollection] 的解压字节上限防护。
+     */
+    const val MAX_TEXT_BYTES = 32L * 1024 * 1024 // 32 MiB
 
     /** 待确认的导入预览（字段映射确认页，M8）：SAF 选完文件先解析到这里，书房面板确认后才入库。 */
     data class ImportPreview(
@@ -97,7 +107,14 @@ object ImportService {
             return null
         }
         val fmt = (format ?: file.extension.lowercase().ifEmpty { "txt" })
-        Log.i(TAG, "preview start: path=$path format=$fmt size=${file.length()}B")
+        val size = file.length()
+        Log.i(TAG, "preview start: path=$path format=$fmt size=${size}B")
+        // 尺寸闸（P2 高危）：CSV/TXT 走整文件 readText，超限直接安全失败，不 OOM。
+        // apkg 的内存防护在 ApkgExtractor 内部（解压字节上限），这里也先拦一道原始包体积。
+        if (size > MAX_TEXT_BYTES) {
+            Log.w(TAG, "preview: $path 太大（${size}B > ${MAX_TEXT_BYTES}B），拒绝导入")
+            return null
+        }
         return try {
             val cards = when (fmt) {
                 "csv" -> CsvImporter.parse(file.readText(Charsets.UTF_8))
@@ -133,11 +150,16 @@ object ImportService {
 
             val copied = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    tmp.outputStream().use { input.copyTo(it) }
+                    tmp.outputStream().use { out -> copyCapped(input, out, MAX_TEXT_BYTES) }
                 } ?: 0L
             }.onFailure { Log.e(TAG, "preview: copy failed for $uri", it) }.getOrDefault(0L)
             if (copied == 0L) {
                 Log.w(TAG, "preview: cannot open or empty: $uri")
+                return@withContext
+            }
+            if (copied >= MAX_TEXT_BYTES) {
+                // P2 高危：SAF 拷进 cacheDir 也无上限会塞满分区；到顶说明文件超限，安全失败。
+                Log.w(TAG, "preview: $displayName 达上限 ${MAX_TEXT_BYTES}B，拒绝（疑似超大文件）")
                 return@withContext
             }
 
@@ -155,13 +177,27 @@ object ImportService {
         }
     }
 
-    /** 确认页点「确认导入」：把预览卡片入库并清空待确认态。 */
-    suspend fun confirmImport(): ImportStats? {
-        val preview = pendingPreview.value ?: return null
-        val stats = persistImported(preview.format, preview.cards)
-        pendingPreview.value = null
-        Log.i(TAG, "confirm import done: $stats")
-        return stats
+    /** 导入进行中的入库串行锁（P2 中危：查重-插入非事务）。见 persistImported。 */
+    private val persistLock = Mutex()
+    private val confirmLock = Mutex()
+
+    /** 确认页点「确认导入」：把预览卡片原子认领、入库并清空待确认态。 */
+    suspend fun confirmImport(): ImportStats? = confirmLock.withLock {
+        // 认领预览（P2 中危：读-清非原子，双击/面板确认+CONFIRM 广播并发 → 同一批入库两遍）。
+        // 本函数已被 confirmLock 串行化；再用 compareAndSet 原子置空，连"确认"与"取消预览"
+        // 并发也只会有一方认领成功，第二个读到 null 或被 CAS 挡下 → 返回 null 不重复入库。
+        val preview = pendingPreview.value ?: return@withLock null
+        if (!pendingPreview.compareAndSet(preview, null)) {
+            Log.i(TAG, "confirm skipped: preview already claimed by a concurrent confirm")
+            return@withLock null
+        }
+        try {
+            persistImported(preview.format, preview.cards).also { Log.i(TAG, "confirm import done: $it") }
+        } catch (t: Throwable) {
+            // 入库失败回滚认领，让用户能在确认页重试；期间若来了新预览则不覆盖。
+            pendingPreview.compareAndSet(null, preview)
+            throw t
+        }
     }
 
     fun cancelPreview() {
@@ -200,20 +236,55 @@ object ImportService {
     }
 
     /** 按 front 去重后批量入库。 */
-    suspend fun persistImported(fmt: String, cards: List<ImportedCard>): ImportStats {
-        val existing = DataGraph.repository.cards.first().map { it.front }.toHashSet()
-        var imported = 0
-        var dup = 0
-        cards.forEach { c ->
-            if (existing.add(c.front)) {
-                DataGraph.repository.add(c.front, c.back)
-                imported++
-            } else {
-                dup++
-            }
-        }
-        val stats = ImportStats(format = fmt, parsed = cards.size, imported = imported, skippedDup = dup)
+    suspend fun persistImported(fmt: String, cards: List<ImportedCard>): ImportStats = persistLock.withLock {
+        val existing = DataGraph.repository.cards.first().map { it.front }
+        val plan = planImportDedup(existing, cards)
+        plan.toInsert.forEach { c -> DataGraph.repository.add(c.front, c.back) }
+        val stats = ImportStats(format = fmt, parsed = cards.size, imported = plan.toInsert.size, skippedDup = plan.duplicates)
         Log.i(TAG, "import result: $stats")
-        return stats
+        stats
     }
+}
+
+// ---------- 纯逻辑（导入去重，JVM 可单测；置于顶层避开 DataGraph/Room 依赖） ----------
+
+/** [planImportDedup] 的结果：待入库列表 + 被去重跳过的条数。 */
+internal class ImportDedupPlan(val toInsert: List<ImportedCard>, val duplicates: Int)
+
+/**
+ * 按 front 去重（P2 中危的「查重」部分下沉为纯函数）：
+ *  - 与库内已存在的 front 冲突 → 跳过；
+ *  - 同一批内后出现的重复 front → 跳过（只保留第一条）。
+ * 顺序保持输入顺序，便于稳定入库。原实现把这两步和 Room 写库揉在挂起函数里无法单测，抽出来锁死语义。
+ */
+internal fun planImportDedup(existingFronts: List<String>, cards: List<ImportedCard>): ImportDedupPlan {
+    val seen = existingFronts.toHashSet()
+    val toInsert = ArrayList<ImportedCard>()
+    var duplicates = 0
+    for (c in cards) {
+        if (seen.add(c.front)) toInsert.add(c) else duplicates++
+    }
+    return ImportDedupPlan(toInsert, duplicates)
+}
+
+/**
+ * 带上限的流拷贝（P2 高危：SAF `copyTo` 无字节上限可塞满 cache 分区）。
+ * 拷到 [maxBytes] 即停并返回已拷数（==maxBytes 表示越界被截断，调用方据此判定超限拒绝），
+ * 不继续写入、不 OOM、不塞满磁盘。
+ */
+private fun copyCapped(input: java.io.InputStream, out: OutputStream, maxBytes: Long): Long {
+    val buf = ByteArray(8192)
+    var total = 0L
+    while (true) {
+        val n = input.read(buf)
+        if (n < 0) break
+        if (total + n >= maxBytes) {
+            val room = (maxBytes - total).toInt()
+            if (room > 0) out.write(buf, 0, room)
+            return maxBytes
+        }
+        out.write(buf, 0, n)
+        total += n
+    }
+    return total
 }

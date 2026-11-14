@@ -10,6 +10,7 @@ import com.memorypalace.audio.SpatialCue
 import com.memorypalace.core.model.Card
 import com.memorypalace.core.schedule.Grade
 import com.memorypalace.data.DataGraph
+import com.memorypalace.notify.DueNotifier
 import com.memorypalace.notify.DueReminder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -143,8 +144,14 @@ object ReviewSession {
                     SpatialCue.entityOf(card.id)?.let { entity ->
                         scope.launch { SpatialCue.play(entity, SpatialCue.CUE_DONE) }
                     }
-                    // M14：复习完了就撤掉"该复习了"的提醒，别让它继续挂着
-                    appContext?.let { DueReminder.cancel(it) }
+                    // M14：这批到期卡复习完，撤掉当前挂着的"该复习了"通知，
+                    // 但要**按剩余卡片的下一个真实到期时刻重排闹钟**——只 cancel 会把
+                    // 队列里今天晚些才到期的卡的提醒一起抹掉，永久不再响（P2 中危）。
+                    // schedule() 内部对"无卡/全到期"本就有 cancel 分支，语义自洽。
+                    appContext?.let { ctx ->
+                        DueNotifier.cancel(ctx)
+                        scope.launch { DueReminder.schedule(ctx) }
+                    }
                     null
                 } else {
                     s.copy(index = next, revealed = false)

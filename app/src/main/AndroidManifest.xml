@@ -6,6 +6,8 @@
          Android 12+ 该权限可被用户撤销，代码里有不精确降级路径。 -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- M-B3：设备重启 / 改时区后重排到期闹钟，否则重启后提醒静默消失（准入「数据/功能连续性」）。 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".app.MemoryPalaceApplication"
@@ -58,6 +60,20 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.memorypalace.notify.FIRE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- M-B3：重启 / 解锁 / 改时间 / 改时区后重排待触发的到期闹钟。
+             系统闹钟不跨重启，缺这个接收器则重启后提醒静默消失（准入门槛「无数据/功能丢失」）。 -->
+        <receiver
+            android:name=".notify.DueReminder$ReminderReceiver"
+            android:exported="false"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>
