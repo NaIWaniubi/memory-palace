@@ -3,9 +3,9 @@
 > 把你的房间变成记忆宫殿 —— 单词贴在冰箱上，公式贴在书桌上。
 > PICO Space Program 2026 · 最佳 PICO Spatial 空间应用赛道参赛作品 · Apache-2.0 开源
 
-![三窗架构：书房看板 + 随身复习卡 + 房间层](media/screenshots/demo_s1_coldstart_3win.jpg)
+**三窗产品界面**：书房看板（1280×720：今日到期 / 时间机器 / 房间平面 / 空间方位罗盘 / 复习）+ 随身复习卡（420×560 浮窗）+ 房间层（锚定在真实家具平面上的卡片 + 空间音频）。应用冷启动默认进入**演示模式 = 净界面**，开发探针不进任何对外展示位。
 
-*上图为 PICO Emulator 6.1 实时截屏（模拟器画面，非真机）。*
+> **对外截图说明（2026-11-14）**：此前的两张 README 头图是在**调试态**截的，画面里混有开发探针面板（实例号 / 事件日志 / adb 命令）——那是脚手架不是产品，已从对外展示位撤下，`media/screenshots/` 仅留作开发实测记录。重截需要设备：一键切净界面的操作清单写在 [docs/DEMO-RUNBOOK.md 附录 D](docs/DEMO-RUNBOOK.md)，有设备后按单重传。
 
 **演示视频**：[media/demo-video.mp4](media/demo-video.mp4) —— 165 秒，14 幕 + 片头片尾。全部画面来自 PICO Emulator 实时截屏（演示模式，无调试信息），右上角常驻「模拟器录制」角标，不伪造真机画面。**没有音轨** —— 分镜里的旁白是给真人念的，不是视频配音，这一条如实标注。
 
@@ -21,9 +21,7 @@
 >
 > 一次进入房间层识别出 **57 个平面**，带家具级语义（地板 / 天花板 / 墙 / 门 / 窗 / 桌面 / 柜子 / 椅子 / 床 / 窗帘）。注入射线打到「桌面」，落点 `(-4.2471, 1.104, -3.3652)`，建出的真实世界锚点落在 `y = 1.124`（命中点 + 2 cm 抬升），持久层记 `label=桌面`，卡片显示「📍 钉在桌面上」。
 >
-> 证据截图（模拟器实时截屏，**非渲染图**）：
->
-> ![房间平面列表与瞄准](media/screenshots/m16-planes-aim.jpg)
+> 证据：逐平面清单与 logcat 原文见 [docs/PLANE-ANCHOR.md](docs/PLANE-ANCHOR.md) §4（模拟器实时截屏取证，非渲染图）。该链路的旧调试态截图已从 README 撤下，待有设备按演示模式重传。
 >
 > 还不诚实的部分写在功能矩阵里：**模拟器没有手柄**（`ControllerTrackingProvider` 返回 `DEVICE_NOT_SUPPORTED`），所以"扣扳机"这一步只能在真机验证；被验证的是除"位姿从哪来"之外的全部链路（几何判定 → 准星 → 落点 → 建锚 → 持久化）。
 
@@ -44,9 +42,26 @@ pico-cli app launch                               # 3. 启动应用
 
 约 12 秒后三窗出现（模拟器**热启动**实测，x86 转译；**全新安装首次因 dex 校验约 27–80 秒**；真机 arm64 原生更快）。首次启动会自动导入三套示例牌组（50 张），开箱即可复习。
 
-**本仓库已在干净克隆下验证**（2026-11-09，同机）：`git clone` → `:core:test` 68 例全绿 → `:app:assembleDebug` 产出 30 MB APK。克隆约 70 秒（含 44MB 演示视频）。**跨机器验证待补**。
+**本仓库已在干净克隆下验证**（2026-11-09，同机）：`git clone` → `:core:test` 全绿（当时 68 例；**现口径 core 113 + app 24 = 137**，见「完成度证据」）→ `:app:assembleDebug` 产出 30 MB APK。克隆约 70 秒（含 44MB 演示视频）。**跨机器验证待补**。
 
-只跑算法单测不需要 Android SDK：`./gradlew :core:test`（`core/` 是纯 JVM 模块，零 SDK 依赖）。
+只跑算法单测不需要 Android SDK：`./gradlew :core:test`（`core/` 是纯 JVM 模块，零 SDK 依赖）；app 层的纯逻辑单测同样无需设备：`./gradlew :app:testDebugUnitTest`。
+
+## 演示模式 vs 调试模式
+
+评委/用户看到的第一帧就是产品界面——**默认态 = 演示模式开**：
+
+| | 演示模式（默认） | 调试模式 |
+|---|---|---|
+| 屏上内容 | 标题、到期队列、时间机器、房间平面、方位罗盘、复习卡 | 额外显示双态探针（实例号 / 计数器 / 屏上事件日志）、无头 adb 命令提示、注入模拟平面入口 |
+| 定位 | 产品态：所有对外截图 / 录屏 / 现场演示 | 开发取证态：跑实测、截证据时用 |
+| 进入方式 | 冷启动即是 | 面板底部小字「显示调试信息」按钮；或无头一条命令（见下） |
+
+```bash
+adb shell am broadcast -a com.memorypalace.dualstate.DEMO_MODE --ez enabled false  # 进调试态
+adb shell am broadcast -a com.memorypalace.dualstate.DEMO_MODE --ez enabled true   # 回净界面（截图/录屏前确认）
+```
+
+两条纪律：① 对外素材只在演示模式下截（重截清单在 [docs/DEMO-RUNBOOK.md 附录 D](docs/DEMO-RUNBOOK.md)）；② 切回演示模式**不影响实测证据链**——双态探针照常写 logcat，屏上只是不显示。为什么这样分：探针面板是验证工具不是产品界面，混在首帧里"像未完成的脚手架"（`DemoMode.kt` 注释原话）。
 
 ## 功能矩阵
 
@@ -59,12 +74,14 @@ pico-cli app launch                               # 3. 启动应用
 | **平面检测 + 家具语义** | ✅ 模拟器已实测：57 个平面，含地板/天花板/墙/门/窗/桌面/柜子/椅子/床/窗帘 | [平面锚定结论](docs/PLANE-ANCHOR.md) |
 | **射线取点 → 任意位置放置** | ✅ 模拟器已实测（注入射线）：命中点 → 真实世界锚点，落点误差 0，抬升 2 cm | [平面锚定结论](docs/PLANE-ANCHOR.md) |
 | **手柄扳机 / 手势捏合确认** | ⚠️ 模拟器 `ControllerTrackingProvider = DEVICE_NOT_SUPPORTED`，扳机这一下只能真机验 | [平面锚定结论](docs/PLANE-ANCHOR.md) |
-| SM-2 两档调度（1 天 → 6 天 → ×EF） | ✅ 已实现，68 例单测全绿（含 26 例平面几何） | [算法说明](docs/ALGORITHM.md) |
+| SM-2 两档调度（1 天 → 6 天 → ×EF） | ✅ 已实现，137 例单测全绿（core 113 + app 24） | [算法说明](docs/ALGORITHM.md) |
 | 看得见的遗忘（卡片随逾期褪色） | ✅ 模拟器已实测 | [时间机器结论](docs/M6-TIME-MACHINE-TEST.md) |
 | 复习流（队列 → 翻面 → 自评 → 调度更新） | ✅ 模拟器已实测 | [复习流结论](docs/M4-REVIEW-FLOW-TEST.md) |
 | CSV / TXT / Anki apkg（anki2 / anki21）导入 + 字段映射确认页 | ✅ 模拟器已实测（**anki21b/zstd 未支持**） | [导入管线](docs/M5-IMPORT-PIPELINE-TEST.md) · [确认页](docs/M8-IMPORT-CONFIRM-TEST.md) |
 | 三套预置示例牌组（语言 / 专业术语 / 生活常识） | ✅ 模拟器已实测 | [预置牌组](docs/M7-PRESET-DECKS-TEST.md) |
 | 空间音频：从锚点实体位置播放提示音 | ⚠️ **只验到「资源加载 + play() 调用成功」**；声场方位、距离衰减未经听感验证 | [实测结论](docs/M12-M14-TEST.md) |
+| 空间方位可视化（逻辑方位罗盘：目标卡「左前 35° · 2.1m」+ 3×3 刻度） | ✅ 方位/俯仰/距离计算 19 例纯 JVM 单测全绿；屏上渲染待模拟器截图（本轮无设备） | [BearingTest](core/src/test/java/com/memorypalace/core/spatial/BearingTest.kt) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| 无手柄放置兜底（面板「在这里放下」/「钉入房间」/「模拟射线瞄准」） | ✅ 链路经无头通道实测（注入射线→命中→建锚）；头显内按钮点击本身按全仓口径列真机待验 | [平面锚定结论](docs/PLANE-ANCHOR.md) |
 | 头显本地到期提醒 | ⚠️ 通知可发出、闹钟可调度；**弹窗呈现与精确闹钟在 PICO OS 未授予**（已降级为不精确闹钟） | [实测结论](docs/M12-M14-TEST.md) |
 | 手势 + 手柄双路径交互 | ⚠️ 手柄路径已通，手势待真机 | 模拟器无法驱动空间按钮 |
 
@@ -77,33 +94,34 @@ pico-cli app launch                               # 3. 启动应用
 双态架构：**Shared Space** 跑 WindowContainer 多窗口管理（书房看板 + 随身卡），**Full Space（Stage）** 跑空间锚定复习。
 
 ```
-┌───────────────────────── PICO OS 6 ─────────────────────────┐
-│  Shared Space                    Full Space (Stage)          │
-│  ┌──────────────┐ ┌───────────┐   ┌───────────────────────┐  │
-│  │ 书房 Window   │ │ 随身卡     │   │ 房间层：锚定卡片 +       │  │
-│  │ Container     │ │ Container │   │ 空间音频 + 手势          │  │
-│  └──────┬───────┘ └─────┬─────┘   └───────────┬───────────┘  │
-│         └───────────────┴─────────────────────┘              │
-│                         │                                    │
-│              spatial/（SDK 适配层）                            │
-│                         │                                    │
-│         core/（数据模型 + SM-2 + 记忆强度，纯 Kotlin 零 SDK）    │
-│                         │                                    │
-│         data/（Room 持久化 + CSV/apkg 导入管线）                │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────── PICO OS 6 ────────────────────────┐
+│ Shared Space                  Full Space (Stage)           │
+│ ┌────────────┐ ┌──────────┐   ┌────────────────────────┐   │
+│ │ 书房窗口     │ │ 随身卡    │   │ 房间层：锚定卡片 +       │   │
+│ │ (1280×720)  │ │ (420×560)│   │ 空间音频 + 手柄/手势     │   │
+│ └─────┬──────┘ └────┬─────┘   └───────────┬────────────┘   │
+│       └─────────────┴─────────────────────┘                │
+│   :app —— Android/PICO 层（ui · anchor · spatial · audio · │
+│            data · notify · review · probe，均为 app 内包）  │
+│                        │ 依赖方向单向：app → core           │
+│   :core —— 纯 JVM：模型 · SM-2 调度 · 导入解析 ·            │
+│            平面几何 · 逻辑方位罗盘（零 SDK、零 android.*）   │
+└────────────────────────────────────────────────────────────┘
 ```
 
-**关键约束**：`core/` 模块不 import 任何 PICO SDK，也不 import `android.*` —— 调度算法与导入管线是纯 JVM，可离线单测，CI 里跑（68 例）。这条约束由 CI 静态检查强制（`.github/workflows/ci.yml`）。
+Gradle 模块**只有 `:app` 与 `:core` 两个**（`settings.gradle.kts` 为准）；data / spatial / audio / notify 是 app 内的包，不是独立模块——早版图里把它们画成平级层是"目录是设想"的误导，已按实际结构重画（原先冒充模块的 5 个顶层空壳目录已删除）。
+
+**关键约束**：`core/` 模块不 import 任何 PICO SDK，也不 import `android.*` —— 调度算法与导入管线是纯 JVM，可离线单测，CI 里跑（core 113 例）。这条约束由 CI 静态检查强制（`.github/workflows/ci.yml`）。二开者怎么在边界内扩展，见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ### 目录
 
 | 路径 | 内容 |
 |---|---|
-| `core/` | 纯 JVM：卡片模型、SM-2 调度器、记忆强度可视化、CSV/TXT/apkg 解析器 |
-| `app/` | Android/PICO 层：三窗 UI、锚定场景、复习会话、导入服务、空间音频 |
-| `data/` | Room 持久化与导入管线（app 内） |
-| `spatial/` | Spatial SDK 适配层预留 |
-| `docs/` | 实测结论、算法、设计规范、评分口径、竞品调研 |
+| `core/` | 纯 JVM：卡片模型、SM-2 调度器、记忆强度、CSV/TXT/apkg 解析、平面几何、逻辑方位罗盘 |
+| `app/` | Android/PICO 层：三窗 UI、锚定场景、复习会话、导入服务、Room 持久化、空间音频、提醒（data/spatial/audio/notify 为其中包） |
+| `docs/` | 实测结论、算法、设计规范、架构与二开指引、评分口径、竞品调研 |
+| `CONTRIBUTING.md` | 环境要求、怎么跑测试、模块边界、加词库/加导入器的操作步骤 |
+| `docs/ARCHITECTURE.md` | 分层图、关键类与数据流、扩展点速查表 |
 | `scripts/gen_audio.py` | 生成空间提示音资产（可复现） |
 
 ## 调度算法
@@ -125,6 +143,8 @@ SM-2 改进版为主路径（**可解释、可单测**），FSRS 保留演进位
 
 这样"走到冰箱前声音在左边"和"卡片贴在冰箱上"用的是同一套坐标系 —— 方位感来自真实锚点位置，不是手写的声像 pan。
 
+模拟器没有空间音频输出路径，听感只能等真机。为了让"按方位发声"**今天就有可核查的证据**，书房面板增加了**逻辑方位罗盘**：把同一份锚点坐标经 `core/spatial/BearingGuide`（纯 JVM，19 例单测锁死符号约定与八方位分桶）算成屏幕上看得见的「『abandon』左前 35° · 2.1m + 3×3 刻度」——真实 `ObjectAudioComponent` 渲染路径原样保留，罗盘展示的是它的几何事实。
+
 提示音资产由 `scripts/gen_audio.py` 程序化生成（48kHz / 16-bit 单声道 WAV），可复现、可审计。
 
 ## Vibe Coding 工作流
@@ -141,6 +161,7 @@ SM-2 改进版为主路径（**可解释、可单测**），FSRS 保留演进位
 
 ```bash
 adb shell am broadcast -a com.memorypalace.dualstate.OPEN_STAGE       # 开房间层
+adb shell am broadcast -a com.memorypalace.dualstate.DEMO_MODE --ez enabled false  # 切调试态（默认=演示净界面）
 adb shell am broadcast -a com.memorypalace.anchor.PLACE --ef x 0 --ef y 1.2 --ef z -1.5 --es front "abandon"
 adb shell am broadcast -a com.memorypalace.review.START               # 开始复习
 adb shell am broadcast -a com.memorypalace.review.GRADE --es grade remember
@@ -164,6 +185,8 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 
 | 文档 | 内容 |
 |---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构：分层图、关键类与数据流、core 零 SDK 边界为什么成立、**扩展点速查表** |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 二开入口：环境、跑测试、模块边界（含 CI 强制那条 grep）、加词库/加导入器步骤、PR 约定 |
 | [docs/ALGORITHM.md](docs/ALGORITHM.md) | SM-2 调度器与记忆强度可视化的完整规则与边界 |
 | [docs/DESIGN.md](docs/DESIGN.md) | 设计规范：色板 / 字号 / 间距 token 与褪色视觉规则 |
 | [docs/SCORING.md](docs/SCORING.md) | 评分维度的自评口径与每个数字的来源（含诚实声明） |
@@ -190,16 +213,30 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 
 `.git` 目录约 **176 MB** —— 原始 PNG 和早期截图留在历史里，没改写历史，因为「全新项目无旧代码搬运」的声明靠连续可查的 commit 时间戳支撑。克隆约 70 秒，可接受。
 
-### core 单测：68 例全绿
+### 单测：137 例全绿（core 113 + app 24，2026-11-14 本机 `./gradlew :core:test :app:testDebugUnitTest` 实测）
 
-| 测试文件 | 用例数 | 状态 |
+| core 测试文件（纯 JVM，`./gradlew :core:test`） | 用例数 | 状态 |
 |---|---|---|
 | `SchedulerTest`（SM-2 调度器） | 12 | ✅ 全绿 |
 | `MemoryStrengthTest`（记忆强度可视化） | 19 | ✅ 全绿 |
 | `ImportersTest`（CSV / TXT / apkg 解析） | 11 | ✅ 全绿 |
-| **合计** | **42** | ✅ 全绿 |
+| `ApkgExtractorTest`（apkg SQLite 抽取） | 8 | ✅ 全绿 |
+| `PlaneGeometryTest`（射线-平面命中 / 正交基 / 轮廓） | 44 | ✅ 全绿 |
+| `BearingTest`（逻辑方位罗盘：符号约定 / 八方位分桶 / NaN 退化） | 19 | ✅ 全绿 |
+| **core 合计** | **113** | ✅ 全绿 |
 
-`core/` 是**纯 JVM 模块，零 SDK 依赖**：不 import 任何 `android.*`，也不 import 任何 `com.pico.*`，唯一的依赖是测试用的 JUnit。所以算法层可以离线跑单测，不需要 Android SDK —— `./gradlew :core:test` 一条命令就完事。这条约束由 CI 静态检查强制（见下）。
+| app 测试文件（同样 JVM 可跑，`./gradlew :app:testDebugUnitTest`，无需设备） | 用例数 | 状态 |
+|---|---|---|
+| `AnchorStoreParseTest`（锚点记录解析逐条隔离） | 4 | ✅ 全绿 |
+| `AnchorClearRetainTest` / `AnchorVerifyDecisionTest`（清除保留 / 降级判定） | 3 + 1 | ✅ 全绿 |
+| `PlanImportDedupTest`（导入去重计划） | 4 | ✅ 全绿 |
+| `DecideReminderTest`（提醒调度决策） | 4 | ✅ 全绿 |
+| `RoomSceneDiffTest`（房间层增量挂载差集） | 8 | ✅ 全绿 |
+| **app 合计** | **24** | ✅ 全绿 |
+
+以上每个数字都来自 `build/test-results/` 的 XML 实测计数（2026-11-14），不是手挑子集。
+
+`core/` 是**纯 JVM 模块，零 SDK 依赖**：不 import 任何 `android.*`，也不 import 任何 `com.pico.*`，唯一的依赖是测试用的 JUnit。所以算法层可以离线跑单测，不需要 Android SDK —— `./gradlew :core:test` 一条命令就完事。这条约束由 CI 静态检查强制（见下），边界内的扩展路径（加导入器 / 加调度策略 / 加词库 / 加窗口）写在 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §5 与 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ### 干净克隆验证结论（2026-11-09）
 
@@ -208,7 +245,7 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 | 步骤 | 结果 |
 |---|---|
 | `git clone` | ✅ 成功，约 70 秒（含 44MB 视频） |
-| `:core:test` | ✅ BUILD SUCCESSFUL，68 例全绿 |
+| `:core:test` | ✅ BUILD SUCCESSFUL，68 例全绿（当日口径；现为 113） |
 | `:app:assembleDebug` | ✅ BUILD SUCCESSFUL，产出 **30 MB** debug APK |
 
 ### CI 现状
@@ -237,7 +274,7 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 
 ### 一句话小结
 
-**评委 clone 下来约 70 秒、`./gradlew :core:test` 一条命令看到 68 例 core 单测全绿；装上模拟器能跑通三窗 + 锚定 + 复习 + 到期提醒的完整闭环。还没验的是 12 项必须靠真机的东西**（空间交互、手势、声场方位、通知弹窗呈现、锚点跨重启存续、SAF 呈现等，完整清单见 [DUAL-STATE-VERIFICATION](docs/DUAL-STATE-VERIFICATION.md) §6）。
+**评委 clone 下来约 70 秒、`./gradlew :core:test` 一条命令看到 113 例 core 单测全绿（app 层另有 24 例，`:app:testDebugUnitTest` 同样无需设备）；装上模拟器能跑通三窗 + 锚定 + 复习 + 到期提醒的完整闭环。还没验的是 12 项必须靠真机的东西**（空间交互、手势、声场方位、通知弹窗呈现、锚点跨重启存续、SAF 呈现等，完整清单见 [DUAL-STATE-VERIFICATION](docs/DUAL-STATE-VERIFICATION.md) §6）。
 
 ## 路线图
 
@@ -245,6 +282,7 @@ adb shell am broadcast -a com.memorypalace.notify.SCHEDULE   # 排到期提醒
 - **2026-11-07**：M2–M8 集中落地 —— 锚定闭环、数据层、复习流、导入管线、时间机器、预置牌组、导入确认页
 - **2026-11-09**：M12 冷启动占位页；M13 空间音频方位引导 + 记忆强度下沉 core（68 例单测全绿）；M14 头显本地到期提醒
 - ~~11/10–11/13：竞品调研 + 文档定稿~~ → **已提前完成（11/09）**：25 款竞品取证、ALGORITHM / DESIGN / SCORING / COMPETITORS 定稿
+- **2026-11-14**：评审集群收口 —— 几何/并发/持久化/稳定性修复（P1/P2）；新增**逻辑方位罗盘**（空间方位屏上可视化，19 例纯 JVM 单测）与**触屏放置兜底链**（无手柄也能演示对准→放置→钉上）；README 撤下调试态头图（重拍清单见 DEMO-RUNBOOK 附录 D）；开源二开文档 CONTRIBUTING / ARCHITECTURE 上线；单测 68 → **137 例（core 113 + app 24）**
 - **11/14–11/22**：真机借测窗口（空间交互唯一验证手段）；锚定最小闭环复测
 - **11/23–11/29**：复习流打磨；11/25 提交 v0.1 占位；11/28 起每日真实使用记录
 - **11/30–12/7**：空间音频真机验证；视觉打磨（设计规范数字化已于 11/07 完成）

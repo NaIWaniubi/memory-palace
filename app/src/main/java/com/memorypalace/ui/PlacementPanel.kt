@@ -70,6 +70,21 @@ fun PlacementPanel() {
                 Button(onClick = { PlaneSensor.clearDemoPlanes() }) {
                     MpText("清除模拟", fontSize = MpType.Caption)
                 }
+                // 无手柄兜底（评审 P3 维度 4 动作 2）：把射线打到第一个平面的中心，
+                // 走的是与真手柄**完全相同**的 publish → PlanePicker 路径。
+                // 配合到期队列的「🎯 手柄放置」与下方「在这里放下」，
+                // 触屏即可完成「对准 → 放置 → 卡片钉上」整条闭环。
+                Button(onClick = {
+                    val p = PlaneSensor.planes.value.firstOrNull()
+                    if (p != null) {
+                        AimPlacement.simulateRay(
+                            origin = p.shape.center + p.shape.normal * 1.2f,
+                            direction = -p.shape.normal,
+                        )
+                    }
+                }) {
+                    MpText("模拟射线瞄准", fontSize = MpType.Caption)
+                }
             }
         }
 
@@ -98,7 +113,7 @@ fun PlacementPanel() {
         if (target != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Md)) {
                 MpText(
-                    "正在瞄准放置：扣扳机 / 捏合确认",
+                    "正在瞄准放置：扣扳机 / 捏合 / 点「在这里放下」",
                     fontSize = MpType.BodySmall,
                     fontWeight = MpType.Bold,
                     color = MpColors.Info,

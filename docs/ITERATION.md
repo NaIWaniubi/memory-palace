@@ -21,6 +21,7 @@
 | 2026-11-07 | M11 三分钟演示路径固化（冷启动自动开三窗 / 锚卡「复习这张」/ 面板「钉入房间」） | [docs/DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) |
 | 2026-11-09 | M12 冷启动占位（**修订版**：LAUNCHER 保持 Spatial stub，改用窗口背景占位；原 SplashActivity 方案因触发 SDK 容器冲突已删除）+ 时间跳转处理中提示 | `app/.../app/LaunchActivity.kt`、`res/values/themes.xml`（`Theme.MpSplash`） |
 | 2026-11-09 | M13 空间音频方位引导 + 记忆强度计算下沉 core（单测 16→42 例） | `app/.../audio/SpatialCue.kt`、`core/.../schedule/MemoryStrength.kt` |
+| 2026-11-14 | **评审集群收口（P1–P3）**：几何/并发/持久化/稳定性修复定稿；M17 逻辑方位罗盘（core `BearingGuide` + 屏上 3×3 刻度，把"按方位发声"变可见证据）+ 触屏放置兜底链（「模拟射线瞄准」/「在这里放下」/「钉入房间」）+ `DEMO_MODE` 无头开关；README 撤调试态头图（重拍清单 DEMO-RUNBOOK 附录 D）；新增 CONTRIBUTING / ARCHITECTURE；删 5 个顶层空壳目录；单测 68 → **137（core 113 + app 24，实跑）** | `core/.../spatial/Bearing.kt`、`docs/ARCHITECTURE.md`、`CONTRIBUTING.md`、git log（P1/P2/P3 集群 commit） |
 | 2026-11-10 | M16 平面检测 + 家具语义 + 射线取点（单测 42→68 例），模拟器实测 57 个平面 | `app/.../spatial/*.kt`、`core/.../spatial/Geometry.kt` |
 | 2026-11-09 | 文档三件套定稿（ALGORITHM / DESIGN / SCORING）+ README 同步到 M13 现状 + CI 真实化 | `docs/`、`.github/workflows/ci.yml` |
 | 2026-11-09 | M14 头显本地到期提醒（通知通道 + 精确闹钟 + 复习后撤销） | `app/.../notify/DueNotifier.kt`、`DueReminder.kt` |
@@ -55,12 +56,13 @@
 
 ## 测试现状
 
+> 2026-11-14 口径：`./gradlew :core:test :app:testDebugUnitTest` 本机实跑，数字取自 `build/test-results/` XML 计数（更早的 42 / 68 例记录见上方里程碑日志对应日期行）。
+
 | 层次 | 数量 | 状态 |
 |---|---|---|
-| core 单测（Scheduler） | 12 例 | ✅ 全绿 |
-| core 单测（MemoryStrength） | 19 例 | ✅ 全绿 |
-| core 单测（Importers） | 11 例 | ✅ 全绿 |
-| **合计** | **68 例** | ✅ 全绿 |
+| core：Scheduler 12 · MemoryStrength 19 · Importers 11 · ApkgExtractor 8 · PlaneGeometry 44 · Bearing 19 | 113 例 | ✅ 全绿 |
+| app（JVM 单测，无需设备）：AnchorStoreParse 4 · AnchorClearRetain 3 · AnchorVerifyDecision 1 · PlanImportDedup 4 · DecideReminder 4 · RoomSceneDiff 8 | 24 例 | ✅ 全绿 |
+| **合计** | **137 例** | ✅ 全绿 |
 
 CI：`.github/workflows/ci.yml` 在 GitHub Actions 跑 core 全量单测 + **四项**静态检查（core 零框架依赖、manifest 有 LAUNCHER 入口、stage meta-data 必须挂在 LAUNCHER activity 上、广播 action 唯一）。
 

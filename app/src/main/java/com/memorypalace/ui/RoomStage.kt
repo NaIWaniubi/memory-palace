@@ -425,7 +425,7 @@ private fun ReticleView() {
     ) {
         MpText("◎", fontSize = MpType.Section, color = if (placing) Color.White else MpColors.Accent)
         MpText(
-            if (placing) "扳机放下" else (label ?: "未指到平面"),
+            if (placing) "扳机 / 面板「在这里放下」" else (label ?: "未指到平面"),
             fontSize = MpType.Caption2,
             color = if (placing) Color.White else MpColors.TextSecondary,
         )

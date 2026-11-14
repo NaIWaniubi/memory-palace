@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.memorypalace.anchor.AnchorScene
 import com.memorypalace.audio.SpatialCue
+import com.memorypalace.core.spatial.BearingGuide
+import com.memorypalace.core.spatial.Vec3
+import com.memorypalace.core.spatial.dialText
 import com.memorypalace.data.Clock
 import com.memorypalace.data.DataGraph
 import com.memorypalace.data.ImportPickerActivity
@@ -116,6 +119,10 @@ fun StudyPanel() {
         // M16：房间平面 + 手柄取点。放在到期队列上面，因为"贴到家具上"是
         // 演示的第一个动作，队列是第二个。
         PlacementPanel()
+
+        // M17（评审 P3 维度 4）：逻辑方位罗盘 —— 把「按方位发声」的几何事实
+        // 变成屏幕上看得见的证据。方位计算在 core（BearingGuide），纯 JVM 单测锁死。
+        SpatialCompassView()
 
         DueQueueView()
 
@@ -297,6 +304,67 @@ private val PLACE_SLOTS = listOf(
     Triple(-0.55f, 1.50f, -1.20f), // 左前偏上（墙面）
     Triple(0.10f, 1.70f, -1.55f),  // 高处
 )
+
+/**
+ * 逻辑方位罗盘（M17，评审 P3 维度 4 动作 1）。
+ *
+ * 空间音频的真实声场只能在真机上听到；这一块把**同一件事的几何事实**
+ * （目标锚点相对观察者的方位角/俯仰/距离）画成屏幕上的罗盘刻度：
+ *  - 目标优先取「最早放置的已到期锚定卡」，没有到期卡就取最近放置的一张；
+ *  - 计算全部在 core 的 `BearingGuide`（纯 JVM，单测锁死符号约定与八方位分桶）；
+ *  - 基准是房间层 Stage 原点与进入朝向（模拟器没有实时头位姿）；真机上
+ *    `ObjectAudioComponent` 用同一份锚点坐标、按实时头位姿渲染声场。
+ * 一条锚定记录都没有时整块隐藏 —— 演示模式下面板保持干净。
+ */
+@Composable
+fun SpatialCompassView() {
+    val records by AnchorScene.records.collectAsState()
+    if (records.isEmpty()) return
+    val cards by DataGraph.repository.cards.collectAsState(initial = emptyList())
+    val tick by Clock.tick.collectAsState()
+    val due = remember(cards, tick) { DataGraph.repository.dueQueue(cards) }
+    val rec = remember(records, due) {
+        val dueIds = due.map { it.id }.toSet()
+        records.filter { it.key in dueIds }.minByOrNull { it.placedAt }
+            ?: records.maxByOrNull { it.placedAt }
+    } ?: return
+    val bearing = BearingGuide.fromStageOrigin(Vec3(rec.px, rec.py, rec.pz))
+
+    Column(verticalArrangement = Arrangement.spacedBy(MpSpace.Sm)) {
+        MpText(
+            "空间方位 · 逻辑罗盘",
+            fontSize = MpType.Section,
+            fontWeight = MpType.Bold,
+            color = MpColors.Info,
+        )
+        if (bearing == null) {
+            MpText("锚点位姿异常，无法计算方位", fontSize = MpType.BodySmall, color = MpColors.Warning)
+            return@Column
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(MpSpace.Lg)) {
+            Column {
+                bearing.dialText().lines().forEach {
+                    MpText(it, fontSize = MpType.Body, color = MpColors.TextPrimary)
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(MpSpace.Xs)) {
+                MpText("「${rec.title.take(18)}」", fontSize = MpType.Body, fontWeight = MpType.Bold)
+                MpText(bearing.format(), fontSize = MpType.BodyLarge, color = MpColors.Info)
+                MpText(
+                    BearingGuide.elevationText(bearing),
+                    fontSize = MpType.BodySmall,
+                    color = MpColors.TextSecondary,
+                )
+            }
+        }
+        MpText(
+            "逻辑方位：以房间层原点与你进入时的朝向为基准（模拟器无实时头位姿）；" +
+                "真机上空间音频用同一份锚点坐标、按实时头位姿渲染声场。",
+            fontSize = MpType.Caption2,
+            color = MpColors.TextSecondary,
+        )
+    }
+}
 
 /** 字段映射确认页（M8）：SAF/预览广播解析出 pendingPreview 后在此确认入库。 */
 @Composable

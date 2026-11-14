@@ -101,7 +101,7 @@ I Plane   : plane 2e605567-... kind=VERTICAL   raw=WALL   label=墙    center=(-
 
 出现的语义：地板 / 天花板 / 墙 / 门 / 窗 / 桌面 / 柜子 / 椅子 / 床 / 窗帘 / 平面（未分类）。
 
-截图（模拟器实测，非渲染图）：
+截图（模拟器实测，非渲染图；本图摄于**调试态**，画面含探针/无头提示，仅作实测取证——对外净界面展示素材按 `DEMO-RUNBOOK.md` 附录 D 在演示模式下重拍，不进 README 头图位）：
 
 ![房间平面列表与瞄准](../media/screenshots/m16-planes-aim.jpg)
 

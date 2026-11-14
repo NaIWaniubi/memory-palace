@@ -28,6 +28,12 @@ object DualStateController {
     const val ACTION_CLOSE_STAGE = "com.memorypalace.dualstate.CLOSE_STAGE"
     const val ACTION_TOGGLE_REVIEW_CARD = "com.memorypalace.dualstate.TOGGLE_REVIEW_CARD"
     const val ACTION_OPEN_WINDOWS = "com.memorypalace.dualstate.OPEN_WINDOWS"
+    /**
+     * M17（评审 P3 维度 3）：无头切换演示模式。默认演示模式开（净界面）；
+     * `--ez enabled false` 一键回调试态取探针证据，重截干净宣传图/录屏时先切回 true。
+     * 免去在头显小按钮上操作，也让"截图必须是演示模式"这条纪律可以写进脚本。
+     */
+    const val ACTION_DEMO_MODE = "com.memorypalace.dualstate.DEMO_MODE"
 
     const val STAGE_ID = "room_stage"
     const val STUDY_PANEL_ID = "study_panel"
@@ -71,6 +77,7 @@ object DualStateController {
             addAction(ACTION_CLOSE_STAGE)
             addAction(ACTION_TOGGLE_REVIEW_CARD)
             addAction(ACTION_OPEN_WINDOWS)
+            addAction(ACTION_DEMO_MODE)
         }
         ContextCompat.registerReceiver(
             context,
@@ -82,6 +89,11 @@ object DualStateController {
                         ACTION_CLOSE_STAGE -> requestCloseStage()
                         ACTION_TOGGLE_REVIEW_CARD -> toggleReviewCard(ctx)
                         ACTION_OPEN_WINDOWS -> openWindows(ctx)
+                        ACTION_DEMO_MODE -> {
+                            val on = intent.getBooleanExtra("enabled", true)
+                            com.memorypalace.ui.DemoMode.set(on)
+                            DualStateProbe.log("controller", "demo mode set to $on")
+                        }
                     }
                 }
             },
