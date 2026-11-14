@@ -259,4 +259,173 @@ class PlaneGeometryTest {
         assertEquals(kotlin.math.sqrt(2f), hit!!.distance, 1e-4f)
         assertTrue(abs(hit.point.y - 0.75f) < 1e-4f)
     }
+
+    // ---------- [P1 阻断] normalized() 的 NaN / Inf 护栏 ----------
+
+    @Test
+    fun `零向量归一化返回 null`() {
+        assertNull(Vec3.ZERO.normalized())
+        assertNull(Vec3(0f, 0f, 0f).normalized())
+    }
+
+    @Test
+    fun `长度小于 EPS 的极小向量归一化返回 null`() {
+        // 有限值先放行入口，再由 len<EPS 拒绝；1e-30 平方在 Float 下溢为 0 也走此路
+        assertNull(Vec3(1e-30f, 0f, 0f).normalized())
+        assertNull(Vec3(1e-8f, 0f, 0f).normalized())
+    }
+
+    @Test
+    fun `含 NaN 分量的向量归一化返回 null 而非 NaN 向量`() {
+        assertNull("NaN 分量绝不能静默产出 NaN 坐标", Vec3(Float.NaN, 1f, 0f).normalized())
+        assertNull(Vec3(0f, Float.NaN, 0f).normalized())
+        assertNull(Vec3(1f, 0f, Float.NaN).normalized())
+    }
+
+    @Test
+    fun `含 Inf 分量的向量归一化返回 null`() {
+        assertNull(Vec3(0f, Float.POSITIVE_INFINITY, 0f).normalized())
+        assertNull(Vec3(Float.NEGATIVE_INFINITY, 0f, 0f).normalized())
+        assertNull(Vec3(1f, 0f, Float.POSITIVE_INFINITY).normalized())
+    }
+
+    @Test
+    fun `有限向量归一化后仍有限且为单位长`() {
+        val v = Vec3(3f, -4f, 0f).normalized()
+        assertNotNull(v)
+        assertTrue(v!!.isFinite())
+        assertEquals(1f, v.length(), 1e-6f)
+    }
+
+    // ---------- [P1 高] Quat.normalized() 的 NaN / Inf 护栏 ----------
+
+    @Test
+    fun `含 NaN 的四元数归一化退回 IDENTITY 而非 NaN 四元数`() {
+        assertEquals(Quat.IDENTITY, Quat(Float.NaN, 0f, 0f, 1f).normalized())
+        assertEquals(Quat.IDENTITY, Quat(0f, Float.NaN, 0f, 1f).normalized())
+        val q = Quat(0f, 0f, 0f, Float.POSITIVE_INFINITY).normalized()
+        assertEquals(Quat.IDENTITY, q)
+        assertTrue(
+            "归一化结果不得含 NaN/Inf 分量",
+            q.x.isFinite() && q.y.isFinite() && q.z.isFinite() && q.w.isFinite(),
+        )
+    }
+
+    @Test
+    fun `零四元数归一化退回 IDENTITY`() {
+        assertEquals(Quat.IDENTITY, Quat(0f, 0f, 0f, 0f).normalized())
+    }
+
+    @Test
+    fun `归一化四元数旋转单位向量仍保持单位长`() {
+        val q = Quat(0.1f, 0.2f, -0.3f, 0.9f).normalized()
+        val r = q.rotate(Vec3(0f, 0f, -1f))
+        assertTrue(r.isFinite())
+        assertEquals(1f, r.length(), 1e-4f)
+    }
+
+    // ---------- 近平行阈值两侧 ----------
+
+    @Test
+    fun `射线近平行低于阈值不命中`() {
+        val big = planeAt(Vec3(0f, 0f, 0f), Vec3.UP, 100f, 100f)
+        // |n·d| ≈ 1e-6 < 1e-4；若无阈值、t≈0.1 本会命中，故此处专测近平行护栏
+        val ray = Ray.of(Vec3(0f, 1e-7f, 0f), Vec3(0f, -1e-6f, -1f))
+        assertNull(PlanePicker.hit(big, ray))
+    }
+
+    @Test
+    fun `射线刚过近平行阈值正常命中`() {
+        val big = planeAt(Vec3(0f, 0f, 0f), Vec3.UP, 100f, 100f)
+        // |n·d| ≈ 5e-3 > 1e-4；t ≈ 2m，落进大面内，应命中且距离有限
+        val ray = Ray.of(Vec3(0f, 0.01f, 0f), Vec3(0f, -5e-3f, -1f))
+        val hit = PlanePicker.hit(big, ray, maxDistance = 5f)
+        assertNotNull(hit)
+        assertTrue("命中距离必须是有限值，不能是 Inf/NaN", hit!!.distance.isFinite())
+    }
+
+    // ---------- t<0：平面在身后 ----------
+
+    @Test
+    fun `平面在射线身后 t 小于零时不命中`() {
+        val big = planeAt(Vec3(0f, 0f, 0f), Vec3.UP, 100f, 100f)
+        // 原点在平面上方且射线朝上：交点在身后，t = -1
+        val ray = Ray.of(Vec3(0f, 1f, 0f), Vec3.UP)
+        assertNull("平面在身后（t<0）必须判不命中", PlanePicker.hit(big, ray))
+    }
+
+    @Test
+    fun `NaN 射线方向被兜底后不命中且不产 NaN 坐标`() {
+        val ray = Ray.of(Vec3(0f, 1.5f, -1f), Vec3(Float.NaN, Float.NaN, Float.NaN))
+        // 修好的 normalized 对 NaN 方向返回 null → Ray.of 兜底成 FORWARD（有限）
+        assertTrue("方向必须被兜底为有限向量", ray.direction.isFinite())
+        val hit = PlanePicker.hit(table, ray)
+        if (hit != null) assertTrue("命中点绝不允许是 NaN", hit.point.isFinite())
+    }
+
+    // ---------- build 拒绝 NaN 法线 / NaN 中心（P1 阻断下游连锁）----------
+
+    @Test
+    fun `NaN 法线构造返回 null 不产出 NaN 平面`() {
+        assertNull(PlaneShape.build(Vec3.ZERO, Vec3(Float.NaN, 0f, 0f), null, 1f, 1f))
+        assertNull(PlaneShape.build(Vec3.ZERO, Vec3(0f, Float.POSITIVE_INFINITY, 0f), null, 1f, 1f))
+    }
+
+    @Test
+    fun `NaN 中心构造返回 null 不产出僵尸平面`() {
+        assertNull(PlaneShape.build(Vec3(Float.NaN, 0f, 0f), Vec3.UP, Vec3(1f, 0f, 0f), 1f, 1f))
+    }
+
+    // ---------- 多平面等距 pick 的确定性 ----------
+
+    @Test
+    fun `多平面等距命中时 pick 结果确定`() {
+        val pA = planeAt(Vec3(0f, 0f, 0f), Vec3.UP, 2f, 2f)
+        val pB = planeAt(Vec3(0.5f, 0f, 0.3f), Vec3.UP, 2f, 2f)
+        val ray = Ray.of(Vec3(0f, 1f, 0f), Vec3.DOWN)
+        assertEquals("构造等距：两平面距离应完全相等", PlanePicker.hit(pA, ray)!!.distance, PlanePicker.hit(pB, ray)!!.distance, 0f)
+        // 等距时 minByOrNull 稳定取列表首位 → 结果只依赖列表顺序，重复调用不变
+        val first = PlanePicker.pick(listOf(pA, pB), ray)!!
+        val second = PlanePicker.pick(listOf(pB, pA), ray)!!
+        assertEquals(pA.center, first.plane.center)
+        assertEquals(pB.center, second.plane.center)
+        repeat(100) {
+            assertEquals("等距 pick 必须逐次稳定", first.plane.center, PlanePicker.pick(listOf(pA, pB), ray)!!.plane.center)
+        }
+    }
+
+    // ---------- 退化平面（bbox=0 / 顶点不足）被正确拒绝 ----------
+
+    @Test
+    fun `零尺寸平面仅在正落中心时可命中`() {
+        val point = planeAt(Vec3(0f, 0.75f, -1f), Vec3.UP, 0f, 0f)
+        assertNotNull("垂直正落中心（local=(0,0)）勉强命中", PlanePicker.hit(point, Ray.of(Vec3(0f, 1.5f, -1f), Vec3.DOWN)))
+        assertNull("偏移即被矩形 covers 拒绝（bbox=0 退化）", PlanePicker.hit(point, Ray.of(Vec3(0.1f, 1.5f, -1f), Vec3.DOWN)))
+    }
+
+    @Test
+    fun `少于三个或退化顶点轮廓求不出法线`() {
+        assertNull(PlaneShape.normalFromPolygon(emptyList()))
+        assertNull(PlaneShape.normalFromPolygon(listOf(Vec3.ZERO)))
+        assertNull(PlaneShape.normalFromPolygon(listOf(Vec3.ZERO, Vec3.ZERO, Vec3.ZERO)))
+        // 混入一个 NaN 顶点：差分成 NaN，叉积归一化经护栏返回 null，不外抛
+        assertNull(PlaneShape.normalFromPolygon(listOf(Vec3(0f, 0f, 0f), Vec3(Float.NaN, 0f, 0f), Vec3(0f, 0f, -1f))))
+    }
+
+    // ---------- acos / 除零类运算：退化输入不抛不 NaN ----------
+
+    @Test
+    fun `退化输入下几何运算不抛异常且不产 NaN`() {
+        // yawToward：命中点正上方（水平分量退化为 0）→ 0，非 NaN
+        assertEquals(0f, PlanePicker.yawToward(Vec3(0f, 0.75f, -1f), Vec3(0f, 1.6f, -1f)), 0f)
+        // yawToward：NaN / Inf 输入被入口护栏挡下 → 仍为有限值
+        assertTrue(PlanePicker.yawToward(Vec3(Float.NaN, 0f, 0f), Vec3(0f, 1f, 1f)).isFinite())
+        assertTrue(PlanePicker.yawToward(Vec3(0f, 0f, 0f), Vec3(0f, 1f, Float.POSITIVE_INFINITY)).isFinite())
+        // pointInPolygon：含水平边（除零隐患处）→ 不抛、结果确定
+        val square = listOf(Vec2(-1f, -1f), Vec2(1f, -1f), Vec2(1f, 1f), Vec2(-1f, 1f))
+        assertTrue(PlaneShape.pointInPolygon(square, Vec2(0f, 0f)))
+        assertFalse(PlaneShape.pointInPolygon(square, Vec2(2f, 0f)))
+        val onBottom = PlaneShape.pointInPolygon(square, Vec2(0f, -1f))
+        assertEquals("扫描线贴水平边应确定", onBottom, PlaneShape.pointInPolygon(square, Vec2(0f, -1f)))
+    }
 }

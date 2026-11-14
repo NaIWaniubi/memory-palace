@@ -29,8 +29,12 @@ data class Vec3(val x: Float, val y: Float, val z: Float) {
 
     fun length(): Float = sqrt(dot(this))
 
-    /** 零向量返回 null —— 宁可让调用方显式处理，也不要静默产出 NaN 坐标。 */
+    /** 零向量或含 NaN/Inf 的向量返回 null —— 宁可让调用方显式处理，也不要静默产出 NaN 坐标。 */
     fun normalized(): Vec3? {
+        // IEEE-754 下 `NaN < EPS` 恒为 false，只判 len<EPS 会让含 NaN/Inf 的向量
+        // 静默产出一个 NaN 向量，正好违背本函数「绝不静默产出 NaN」的设计意图。
+        // 故入口先挡非有限值，再走零长判定。
+        if (!isFinite()) return null
         val len = length()
         if (len < EPS) return null
         return Vec3(x / len, y / len, z / len)
@@ -67,7 +71,11 @@ data class Quat(val x: Float, val y: Float, val z: Float, val w: Float) {
         return v + t * w + (q cross t)
     }
 
+    /** 含 NaN/Inf 或零长的四元数退回 IDENTITY —— 与 Vec3 同理，绝不静默产出 NaN 四元数。 */
     fun normalized(): Quat {
+        // 签名是 Quat（非空），退化只能退回 IDENTITY；入口先挡四个分量的非有限值，
+        // 否则 sqrt(NaN)=NaN、NaN<EPS 为 false，会返回一个把 rotate 全带成 NaN 的僵尸四元数。
+        if (!x.isFinite() || !y.isFinite() || !z.isFinite() || !w.isFinite()) return IDENTITY
         val n = sqrt(x * x + y * y + z * z + w * w)
         if (n < Vec3.EPS) return IDENTITY
         return Quat(x / n, y / n, z / n, w / n)
@@ -145,6 +153,7 @@ data class PlaneShape(
             halfV: Float,
             outline: List<Vec2>? = null,
         ): PlaneShape? {
+            if (!center.isFinite()) return null
             val n = normalHint.normalized() ?: return null
             var u = uHint?.let { hint -> (hint - n * (hint dot n)).normalized() }
             if (u == null) {
@@ -272,6 +281,8 @@ object PlanePicker {
     fun yawToward(hit: Vec3, viewer: Vec3): Float {
         val dx = viewer.x - hit.x
         val dz = viewer.z - hit.z
+        // 入口挡非有限值：否则 atan2(NaN, …) 会把 NaN 悄悄当成合法 yaw 返回
+        if (!dx.isFinite() || !dz.isFinite()) return 0f
         if (abs(dx) < Vec3.EPS && abs(dz) < Vec3.EPS) return 0f
         // atan2(x, z)：0 表示朝 +Z，与 EulerAngles.yaw 的零点一致
         return Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
