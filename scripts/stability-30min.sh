@@ -186,12 +186,36 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# ---------- 冷启动应用 ----------
+# ---------- 冷启动应用（等进程真的起来再开窗，别把慢启动误判成崩溃）----------
+# 本机 PICO 模拟器冷启动到三窗实测约 12s，宿主满载时更久；固定 sleep 会让
+# 第一个样本抓到 pid=0，被判成 DEAD 直接判负 —— 那是取证的假阳性，不是应用缺陷。
+# 所以这里用有界轮询确认进程存在后才开始计时窗口；超时报 exit 2（前置条件不满足）。
 log "冷启动 $PKG"
 adb shell am force-stop "$PKG" >/dev/null 2>&1
-adb shell am start -n "$ACTIVITY" >/dev/null 2>&1
-sleep 6
-adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+WARM_TIMEOUT="${WARM_TIMEOUT:-150}"
+warm=0
+while :; do
+  pid="$(app_pid)"
+  [ -n "${pid:-}" ] && break
+  # 每 ~12s 补一次拉起（首次 + 兜底 monkey），避免单次 am start 被 XR home 抢焦点而未起
+  if [ $((warm % 12)) -eq 0 ]; then
+    adb shell am start -n "$ACTIVITY" >/dev/null 2>&1
+    [ "$warm" -gt 0 ] && adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+  fi
+  sleep 3; warm=$((warm+3))
+  if [ "$warm" -ge "$WARM_TIMEOUT" ]; then
+    fail "❌ ${WARM_TIMEOUT}s 内进程未起来（环境/安装问题，非稳定性结论），不开始计时窗口。"
+    exit 2
+  fi
+done
+log "进程已就绪 pid=$pid（预热 ${warm}s），开始 ${DURATION_SEC}s 连续运行窗口"
+# 进程起来 ≠ 内存到位：实测空间应用加载期 PSS 会从 ~108MB 冲到 ~161MB，
+# 而同期 Native Heap 几乎不变（+24KB）。若窗口从此刻开始采样，这段热身会被
+# 误判成「PSS 持续上升=泄漏」。所以再等一段稳定期，让基线落在真实工作集上。
+STABLE_SEC="${STABLE_SEC:-90}"
+log "等待 ${STABLE_SEC}s 让内存基线稳定（避免把加载热身误判为泄漏）"
+sleep "$STABLE_SEC"
+adb logcat -c >/dev/null 2>&1 || true
 
 # ---------- 主循环：驱动压力 + 采样 ----------
 END=$(( $(date +%s) + DURATION_SEC ))
